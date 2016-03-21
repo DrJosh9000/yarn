@@ -87,15 +87,31 @@ type Program struct {
 	nodeTable   map[string]*Node
 }
 
-// Dunno what a Dialogue is yet.
-type Dialogue struct{}
+// Function represents a callable function from the VM.
+type Function interface {
+	Invoke(params ...interface{}) (interface{}, error)
+	ParamCount() int
+	Returns() bool
+}
+
+// Library is a collection of functions callable from the VM.
+type Library interface {
+	Function(name string) (Function, error)
+}
+
+// VariableStorage stores numeric variables.
+type VariableStorage interface {
+	Set(name string, value float64)
+	Get(name) (value float64, ok bool)
+	Clear()
+}
 
 // Delegate receives events from the VM.
 type Delegate interface {
-	Line(line string) error                                        // handle a line of dialogue
-	Command(command string) error                                  // handle a comment
-	Options(options []string, pickedOption func(option int)) error // user picks an option
-	NodeComplete(nextNode string)                                  // this node is complete
+	Line(line string) error                                              // handle a line of dialogue
+	Command(command string) error                                        // handle a comment
+	Options(options []string, pickedOption func(option int) error) error // user picks an option
+	NodeComplete(nextNode string)                                        // this node is complete
 }
 
 type option struct{ id, node string }
@@ -104,9 +120,10 @@ type option struct{ id, node string }
 type VM struct {
 	es ExecState
 	p  *Program
-	d  *Dialogue
 	s  *VMState
 	Delegate
+	Library
+	VariableStorage
 }
 
 // Stop stops the virtual machine.
@@ -123,6 +140,9 @@ func (m *VM) RunNext() error {
 	if m.Delegate == nil {
 		return errors.New("delegate is nil")
 	}
+	if m.VariableStorage == nil {
+		return errors.New("variable storage is nil")
+	}
 	node, ok := m.p.nodeTable[m.s.node]
 	if !ok {
 		return fmt.Errorf("illegal state; unknown node of program %q", m.s.node)
@@ -137,6 +157,40 @@ func (m *VM) RunNext() error {
 	m.s.pc++
 	if m.s.pc >= len(node.code) {
 		m.es = ExecStateStopped
+	}
+}
+
+func (m *VM) optionPicked(i int) error {
+	if m.es != ExecStateWaitOnOptionSelection {
+		return fmt.Errorf("machine is not waiting for an option selection [m.es = %d]", m.es)
+	}
+	if i < 0 || i >= len(m.s.options) {
+		return fmt.Errorf("selected option %d out of bounds [0, %d)", i, len(m.s.options))
+	}
+	m.s.Push(m.s.options[i].node)
+	m.s.options = nil
+	m.es = ExecStateRunning
+	return nil
+}
+
+func convertToBool(x interface{}) (bool, error) {
+	if x == nil {
+		return false, nil
+	}
+	switch t := x.(type) {
+	case bool:
+		return t, nil
+	case float64:
+		return t != 0, nil
+	case int:
+		return t != 0, nil
+	case string:
+		return len(t) > 0, nil
+	default:
+		if t == nil {
+			return false, nil
+		}
+		return false, fmt.Errorf("cannot convert value of type %T to a bool", x)
 	}
 }
 
@@ -215,7 +269,7 @@ func (m *VM) Execute(i Instruction, node *Node) error {
 			m.s.options = nil
 			return nil
 		}
-		// TODO: implement shuffling depending on configuration.
+		// TODO: implement shuffling of options depending on configuration.
 		ops := make([]string, 0, len(m.s.options))
 		for _, op := range m.s.options {
 			s, ok = m.p.stringTable[op.id]
@@ -225,9 +279,7 @@ func (m *VM) Execute(i Instruction, node *Node) error {
 			ops = append(ops, s)
 		}
 		m.es = ExecStateWaitOnOptionSelection
-		if err := m.Options(ops, func(i int) {
-
-		}); err != nil {
+		if err := m.Options(ops, m.optionPicked); err != nil {
 			return err
 		}
 
@@ -250,12 +302,9 @@ func (m *VM) Execute(i Instruction, node *Node) error {
 		m.s.Push(x)
 
 	case ByteCodePushBool:
-		x, ok := i.opA.(int)
+		x, ok := i.opA.(bool)
 		if !ok {
-			return fmt.Errorf("wrong type in opA [%T != int]", i.opA)
-		}
-		if x != 0 && x != 1 {
-			return fmt.Errorf("opA %d is not in {0, 1}")
+			return fmt.Errorf("wrong type in opA [%T != bool]", i.opA)
 		}
 		m.s.Push(x)
 
@@ -263,19 +312,90 @@ func (m *VM) Execute(i Instruction, node *Node) error {
 		m.s.Push(nil)
 
 	case ByteCodeJumpIfFalse:
-		// TODO: implement
+		x, err := m.s.Peek()
+		if err != nil {
+			return err
+		}
+		b, err := convertToBool(x)
+		if err != nil {
+			return err
+		}
+		if b {
+			return nil
+		}
+		k, ok := i.opA.(string)
+		if !ok {
+			return fmt.Errorf("wrong type in opA [%T != string]", i.opA)
+		}
+		pc, ok := node.labels[k]
+		if !ok {
+			return fmt.Errorf("unknown label %q", k)
+		}
+		m.s.pc = pc
 
 	case ByteCodePop:
 		m.s.Pop()
 
 	case ByteCodeCallFunc:
-		// TODO: complicated
+		k, ok := i.opA.(string)
+		if !ok {
+			return fmt.Errorf("wrong type in opA [%T != string]", i.opA)
+		}
+		f, err := m.Library.Function(k)
+		if err != nil {
+			return err
+		}
+		c := f.ParamCount()
+		if c == -1 {
+			// Variadic, so param count is on stack.
+			x, err := m.s.Pop()
+			if err != nil {
+				return err
+			}
+			y, ok := x.(int)
+			if !ok {
+				return fmt.Errorf("wrong type popped from stack [%T != int]", x)
+			}
+			c = y
+		}
+		params := make([]interface{}, c)
+		for c >= 0 {
+			c--
+			p, err := m.s.Pop()
+			if err != nil {
+				return err
+			}
+			params[c] = p
+		}
+		r, err := f.Invoke(params...)
+		if err != nil {
+			return err
+		}
+		if f.Returns() {
+			m.s.Push(r)
+		}
 
 	case ByteCodePushVariable:
-		// TODO: get variable
+		k, ok := i.opA.(string)
+		if !ok {
+			return fmt.Errorf("wrong type in opA [%T != string]", i.opA)
+		}
+		v, ok := m.VariableStorage.Get(k)
+		if !ok {
+			return fmt.Errorf("no variable called %q", k)
+		}
+		m.s.Push(v)
 
 	case ByteCodeStoreVariable:
-		// TODO: store variable
+		k, ok := i.opA.(string)
+		if !ok {
+			return fmt.Errorf("wrong type in opA [%T != string]", i.opA)
+		}
+		v, err := m.s.Peek()
+		if err != nil {
+			return err
+		}
+		m.VariableStorage.Set(k, v)
 
 	case ByteCodeStop:
 		m.es = ExecStateStopped
@@ -299,6 +419,9 @@ func (m *VM) Execute(i Instruction, node *Node) error {
 		}
 		// TODO: completion handler
 		m.s.node = node
+
+	default:
+		return fmt.Errorf("invalid instruction %d", i.bc)
 	}
 	return nil
 }
