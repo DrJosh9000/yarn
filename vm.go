@@ -1,29 +1,50 @@
+// Copyright 2016 Josh Deprez
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 // Package yarn implements the YarnSpinner VM (see github.com/thesecretlab/YarnSpinner).
 package yarn
+
+import (
+	"errors"
+	"fmt"
+	"strconv"
+)
+
+// BUG: This package hasn't been used or tested yet, and is incomplete.
 
 // ByteCode represents the operations the VM can perform.
 type ByteCode int
 
 const (
-	ByteCodeLabel         = ByteCode(iota) // opA = string: label name
-	ByteCodeJumpTo                         // opA = string: label name
-	ByteCodeJump                           // peek string from stack and jump to that label
-	ByteCodeRunLine                        // opA = int: string number
-	ByteCodeRunCommand                     // opA = string: command text
-	ByteCodeAddOption                      // opA = int: string number for option to add
-	ByteCodeShowOptions                    // present the current list of options, then clear the list; most recently selected option will be on the top of the stack
-	ByteCodePushString                     // opA = int: string number in table; push string to stack
-	ByteCodePushNumber                     // opA = float: number to push to stack
-	ByteCodePushBool                       // opA = int (0 or 1): bool to push to stack
-	ByteCodePushNull                       // pushes a null value onto the stack
-	ByteCodeJumpIfFalse                    // opA = string: label name if top of stack is not null, zero or false, jumps to that label
-	ByteCodePop                            // discard top of stack
-	ByteCodeCallFunc                       // opA = string; looks up function, pops as many arguments as needed, result is pushed to stack
-	ByteCodePushVariable                   // opA = name of variable to get value of and push to stack
-	ByteCodeStoreVariable                  // opA = name of variable to store top of stack in
-	ByteCodeStop                           // stops execution
-	ByteCodeRunNode                        // run the node whose name is at the top of the stack
-
+	ByteCodeLabel = ByteCode(iota)
+	ByteCodeJumpTo
+	ByteCodeJump
+	ByteCodeRunLine
+	ByteCodeRunCommand
+	ByteCodeAddOption
+	ByteCodeShowOptions
+	ByteCodePushString
+	ByteCodePushNumber
+	ByteCodePushBool
+	ByteCodePushNull
+	ByteCodeJumpIfFalse
+	ByteCodePop
+	ByteCodeCallFunc
+	ByteCodePushVariable
+	ByteCodeStoreVariable
+	ByteCodeStop
+	ByteCodeRunNode
 )
 
 // ExecState is the highest-level machine state.
@@ -87,7 +108,7 @@ type Program struct {
 	nodeTable   map[string]*Node
 }
 
-// Function represents a callable function from the VM.
+// Function represents a generic callable function from the VM.
 type Function interface {
 	Invoke(params ...interface{}) (interface{}, error)
 	ParamCount() int
@@ -102,7 +123,7 @@ type Library interface {
 // VariableStorage stores numeric variables.
 type VariableStorage interface {
 	Set(name string, value float64)
-	Get(name) (value float64, ok bool)
+	Get(name string) (value float64, ok bool)
 	Clear()
 }
 
@@ -158,6 +179,7 @@ func (m *VM) RunNext() error {
 	if m.s.pc >= len(node.code) {
 		m.es = ExecStateStopped
 	}
+	return nil
 }
 
 func (m *VM) optionPicked(i int) error {
@@ -191,6 +213,55 @@ func convertToBool(x interface{}) (bool, error) {
 			return false, nil
 		}
 		return false, fmt.Errorf("cannot convert value of type %T to a bool", x)
+	}
+}
+
+func convertToInt(x interface{}) (int, error) {
+	if x == nil {
+		return 0, nil
+	}
+	switch t := x.(type) {
+	case bool:
+		if t {
+			return 1, nil
+		}
+		return 0, nil
+	case float64:
+		return int(t), nil
+	case int:
+		return t, nil
+	case string:
+		i, err := strconv.ParseInt(t, 10, 64)
+		return int(i), err
+	default:
+		if t == nil {
+			return 0, nil
+		}
+		return 0, fmt.Errorf("cannot convert value of type %T to int", x)
+	}
+}
+
+func convertToFloat(x interface{}) (float64, error) {
+	if x == nil {
+		return 0.0, nil
+	}
+	switch t := x.(type) {
+	case bool:
+		if t {
+			return 1.0, nil
+		}
+		return 0.0, nil
+	case float64:
+		return t, nil
+	case int:
+		return float64(t), nil
+	case string:
+		return strconv.ParseFloat(t, 64)
+	default:
+		if t == nil {
+			return 0.0, nil
+		}
+		return 0.0, fmt.Errorf("cannot convert value of type %T to float64", x)
 	}
 }
 
@@ -272,7 +343,7 @@ func (m *VM) Execute(i Instruction, node *Node) error {
 		// TODO: implement shuffling of options depending on configuration.
 		ops := make([]string, 0, len(m.s.options))
 		for _, op := range m.s.options {
-			s, ok = m.p.stringTable[op.id]
+			s, ok := m.p.stringTable[op.id]
 			if !ok {
 				return fmt.Errorf("no string in string table for key %q", op.id)
 			}
@@ -395,7 +466,11 @@ func (m *VM) Execute(i Instruction, node *Node) error {
 		if err != nil {
 			return err
 		}
-		m.VariableStorage.Set(k, v)
+		x, err := convertToFloat(v)
+		if err != nil {
+			return err
+		}
+		m.VariableStorage.Set(k, x)
 
 	case ByteCodeStop:
 		m.es = ExecStateStopped
@@ -405,9 +480,13 @@ func (m *VM) Execute(i Instruction, node *Node) error {
 		node := ""
 		if i.opA == nil || i.opA.(string) == "" {
 			// Use the stack, Luke.
-			n, err := m.s.Peek()
+			t, err := m.s.Peek()
 			if err != nil {
 				return err
+			}
+			n, ok := t.(string)
+			if !ok {
+				return fmt.Errorf("wrong type at top of stack [%T != string]", t)
 			}
 			node = n
 		} else {
