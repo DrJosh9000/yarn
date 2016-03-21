@@ -1,2 +1,2 @@
 # yarn
-Yarn implements the YarnSpinner virtual machine in Go.
+The yarn package implements the YarnSpinner virtual machine in Go.
