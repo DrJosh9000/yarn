@@ -132,9 +132,6 @@ func (vm *VM) Execute(instruction *bytecode.Instruction, node *bytecode.Node) er
 
 	case bytecode.Instruction_JUMP_TO:
 		k := instruction.Operands[0].GetStringValue()
-		if k == "" {
-			return fmt.Errorf("wrong type in opA or empty string [%T]", instruction.Operands[0].Value)
-		}
 		pc, ok := node.Labels[k]
 		if !ok {
 			return fmt.Errorf("unknown label %q", k)
@@ -158,9 +155,6 @@ func (vm *VM) Execute(instruction *bytecode.Instruction, node *bytecode.Node) er
 
 	case bytecode.Instruction_RUN_LINE:
 		k := instruction.Operands[0].GetStringValue()
-		if k == "" {
-			return fmt.Errorf("wrong type in opA or empty string [%T]", instruction.Operands[0].Value)
-		}
 		l, ok := vm.program.stringTable[k]
 		if !ok {
 			return fmt.Errorf("no string in string table for key %q", k)
@@ -170,24 +164,16 @@ func (vm *VM) Execute(instruction *bytecode.Instruction, node *bytecode.Node) er
 		}
 
 	case bytecode.Instruction_RUN_COMMAND:
-		c := instruction.Operands[0].GetStringValue()
-		if c == "" {
-			return fmt.Errorf("wrong type in opA or empty string [%T]", instruction.Operands[0].Value)
-		}
-		if err := vm.Command(c); err != nil {
+		a := instruction.Operands[0].GetStringValue()
+		if err := vm.Command(a); err != nil {
 			return err
 		}
 
 	case bytecode.Instruction_ADD_OPTION:
-		a, ok := instruction.opA.(string)
-		if !ok {
-			return fmt.Errorf("wrong type in opA [%T != string]", instruction.opA)
-		}
-		b, ok := instruction.opB.(string)
-		if !ok {
-			return fmt.Errorf("wrong type in opB [%T != string]", instruction.opB)
-		}
-		vm.vmState.options = append(vm.vmState.options, option{id: a, node: b})
+		vm.vmState.options = append(vm.vmState.options, option{
+			id: instruction.Operands[0].GetStringValue(), 
+			node: instruction.Operands[1].GetStringValue(),
+		})
 
 	case bytecode.Instruction_SHOW_OPTIONS:
 		switch len(vm.vmState.options) {
@@ -214,29 +200,18 @@ func (vm *VM) Execute(instruction *bytecode.Instruction, node *bytecode.Node) er
 		}
 
 	case bytecode.Instruction_PUSH_STRING:
-		x, ok := instruction.opA.(string)
+		a := instruction.Operands[0].GetStringValue()
+		s, ok := vm.program.stringTable[a]
 		if !ok {
-			return fmt.Errorf("wrong type in opA [%T != string]", instruction.opA)
-		}
-		s, ok := vm.program.stringTable[x]
-		if !ok {
-			return fmt.Errorf("no string in string table for key %q", x)
+			return fmt.Errorf("no string in string table for key %q", a)
 		}
 		vm.vmState.Push(s)
 
 	case bytecode.Instruction_PUSH_FLOAT:
-		x, ok := instruction.opA.(float64)
-		if !ok {
-			return fmt.Errorf("wrong type in opA [%T != float64]", instruction.opA)
-		}
-		vm.vmState.Push(x)
+		vm.vmState.Push(instruction.Operands[0].GetFloatValue())
 
 	case bytecode.Instruction_PUSH_BOOL:
-		x, ok := instruction.opA.(bool)
-		if !ok {
-			return fmt.Errorf("wrong type in opA [%T != bool]", instruction.opA)
-		}
-		vm.vmState.Push(x)
+		vm.vmState.Push(instruction.Operands[0].GetBoolValue())
 
 	case bytecode.Instruction_PUSH_NULL:
 		vm.vmState.Push(nil)
@@ -264,13 +239,12 @@ func (vm *VM) Execute(instruction *bytecode.Instruction, node *bytecode.Node) er
 		vm.vmState.pc = pc
 
 	case bytecode.Instruction_POP:
-		vm.vmState.Pop()
+		if _, err := vm.vmState.Pop(); err != nil {
+			return err
+		}
 
 	case bytecode.Instruction_CALL_FUNC:
-		k, ok := instruction.opA.(string)
-		if !ok {
-			return fmt.Errorf("wrong type in opA [%T != string]", instruction.opA)
-		}
+		k := instruction.Operands[0].GetStringValue()
 		f, err := vm.Library.Function(k)
 		if err != nil {
 			return err
@@ -306,10 +280,7 @@ func (vm *VM) Execute(instruction *bytecode.Instruction, node *bytecode.Node) er
 		}
 
 	case bytecode.Instruction_PUSH_VARIABLE:
-		k, ok := instruction.opA.(string)
-		if !ok {
-			return fmt.Errorf("wrong type in opA [%T != string]", instruction.opA)
-		}
+		k := instruction.Operands[0].GetStringValue()
 		v, ok := vm.VariableStorage.Get(k)
 		if !ok {
 			return fmt.Errorf("no variable called %q", k)
@@ -317,10 +288,7 @@ func (vm *VM) Execute(instruction *bytecode.Instruction, node *bytecode.Node) er
 		vm.vmState.Push(v)
 
 	case bytecode.Instruction_STORE_VARIABLE:
-		k, ok := instruction.opA.(string)
-		if !ok {
-			return fmt.Errorf("wrong type in opA [%T != string]", instruction.opA)
-		}
+		k := instruction.Operands[0].GetStringValue()
 		v, err := vm.vmState.Peek()
 		if err != nil {
 			return err
@@ -336,8 +304,8 @@ func (vm *VM) Execute(instruction *bytecode.Instruction, node *bytecode.Node) er
 		// TODO: report execution stopped?
 
 	case bytecode.Instruction_RUN_NODE:
-		node := ""
-		if instruction.opA == nil || instruction.opA.(string) == "" {
+		node := instruction.Operands[0].GetStringValue()
+		if node == "" {
 			// Use the stack, Luke.
 			t, err := vm.vmState.Peek()
 			if err != nil {
@@ -348,13 +316,7 @@ func (vm *VM) Execute(instruction *bytecode.Instruction, node *bytecode.Node) er
 				return fmt.Errorf("wrong type at top of stack [%T != string]", t)
 			}
 			node = n
-		} else {
-			n, ok := instruction.opA.(string)
-			if !ok {
-				return fmt.Errorf("wrong type in opA [%T != string]", instruction.opA)
-			}
-			node = n
-		}
+		} 
 		// TODO: completion handler
 		vm.vmState.node = node
 
