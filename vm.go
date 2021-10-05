@@ -19,7 +19,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/DrJosh9000/yarn/bytecode"
+	yarnpb "github.com/DrJosh9000/yarn/bytecode"
 )
 
 // BUG: This package hasn't been used or tested yet, and is incomplete.
@@ -70,7 +70,7 @@ func (s *VMState) Clear() { s.stack = nil }
 // VM implements the virtual machine.
 type VM struct {
 	execState ExecState
-	program   *bytecode.Program
+	program   *yarnpb.Program
 	vmState   *VMState
 
 	Delegate
@@ -127,10 +127,10 @@ func (vm *VM) optionPicked(i int) error {
 }
 
 // Execute executes a single instruction.
-func (vm *VM) Execute(instruction *bytecode.Instruction, node *bytecode.Node) error {
+func (vm *VM) Execute(instruction *yarnpb.Instruction, node *yarnpb.Node) error {
 	switch instruction.Opcode {
 
-	case bytecode.Instruction_JUMP_TO:
+	case yarnpb.Instruction_JUMP_TO:
 		k := instruction.Operands[0].GetStringValue()
 		pc, ok := node.Labels[k]
 		if !ok {
@@ -138,7 +138,7 @@ func (vm *VM) Execute(instruction *bytecode.Instruction, node *bytecode.Node) er
 		}
 		vm.vmState.pc = int(pc)
 
-	case bytecode.Instruction_JUMP:
+	case yarnpb.Instruction_JUMP:
 		o, err := vm.vmState.Peek()
 		if err != nil {
 			return err
@@ -153,29 +153,25 @@ func (vm *VM) Execute(instruction *bytecode.Instruction, node *bytecode.Node) er
 		}
 		vm.vmState.pc = int(pc)
 
-	case bytecode.Instruction_RUN_LINE:
+	case yarnpb.Instruction_RUN_LINE:
 		k := instruction.Operands[0].GetStringValue()
-		l, ok := vm.program.stringTable[k]
-		if !ok {
-			return fmt.Errorf("no string in string table for key %q", k)
-		}
-		if err := vm.Line(l); err != nil {
+		if err := vm.Line(k); err != nil {
 			return err
 		}
 
-	case bytecode.Instruction_RUN_COMMAND:
+	case yarnpb.Instruction_RUN_COMMAND:
 		a := instruction.Operands[0].GetStringValue()
 		if err := vm.Command(a); err != nil {
 			return err
 		}
 
-	case bytecode.Instruction_ADD_OPTION:
+	case yarnpb.Instruction_ADD_OPTION:
 		vm.vmState.options = append(vm.vmState.options, option{
-			id: instruction.Operands[0].GetStringValue(), 
+			id:   instruction.Operands[0].GetStringValue(),
 			node: instruction.Operands[1].GetStringValue(),
 		})
 
-	case bytecode.Instruction_SHOW_OPTIONS:
+	case yarnpb.Instruction_SHOW_OPTIONS:
 		switch len(vm.vmState.options) {
 		case 0:
 			// NOTE: jon implements this as a machine stop instead of an exception
@@ -188,35 +184,27 @@ func (vm *VM) Execute(instruction *bytecode.Instruction, node *bytecode.Node) er
 		// TODO: implement shuffling of options depending on configuration.
 		ops := make([]string, 0, len(vm.vmState.options))
 		for _, op := range vm.vmState.options {
-			s, ok := vm.program.stringTable[op.id]
-			if !ok {
-				return fmt.Errorf("no string in string table for key %q", op.id)
-			}
-			ops = append(ops, s)
+			ops = append(ops, op.id)
 		}
 		vm.execState = ExecStateWaitOnOptionSelection
 		if err := vm.Options(ops, vm.optionPicked); err != nil {
 			return err
 		}
 
-	case bytecode.Instruction_PUSH_STRING:
+	case yarnpb.Instruction_PUSH_STRING:
 		a := instruction.Operands[0].GetStringValue()
-		s, ok := vm.program.stringTable[a]
-		if !ok {
-			return fmt.Errorf("no string in string table for key %q", a)
-		}
-		vm.vmState.Push(s)
+		vm.vmState.Push(a)
 
-	case bytecode.Instruction_PUSH_FLOAT:
+	case yarnpb.Instruction_PUSH_FLOAT:
 		vm.vmState.Push(instruction.Operands[0].GetFloatValue())
 
-	case bytecode.Instruction_PUSH_BOOL:
+	case yarnpb.Instruction_PUSH_BOOL:
 		vm.vmState.Push(instruction.Operands[0].GetBoolValue())
 
-	case bytecode.Instruction_PUSH_NULL:
+	case yarnpb.Instruction_PUSH_NULL:
 		vm.vmState.Push(nil)
 
-	case bytecode.Instruction_JUMP_IF_FALSE:
+	case yarnpb.Instruction_JUMP_IF_FALSE:
 		x, err := vm.vmState.Peek()
 		if err != nil {
 			return err
@@ -228,22 +216,19 @@ func (vm *VM) Execute(instruction *bytecode.Instruction, node *bytecode.Node) er
 		if b {
 			return nil
 		}
-		k, ok := instruction.opA.(string)
-		if !ok {
-			return fmt.Errorf("wrong type in opA [%T != string]", instruction.opA)
-		}
-		pc, ok := node.labels[k]
+		k := instruction.Operands[0].GetStringValue()
+		pc, ok := node.Labels[k]
 		if !ok {
 			return fmt.Errorf("unknown label %q", k)
 		}
-		vm.vmState.pc = pc
+		vm.vmState.pc = int(pc)
 
-	case bytecode.Instruction_POP:
+	case yarnpb.Instruction_POP:
 		if _, err := vm.vmState.Pop(); err != nil {
 			return err
 		}
 
-	case bytecode.Instruction_CALL_FUNC:
+	case yarnpb.Instruction_CALL_FUNC:
 		k := instruction.Operands[0].GetStringValue()
 		f, err := vm.Library.Function(k)
 		if err != nil {
@@ -279,7 +264,7 @@ func (vm *VM) Execute(instruction *bytecode.Instruction, node *bytecode.Node) er
 			vm.vmState.Push(r)
 		}
 
-	case bytecode.Instruction_PUSH_VARIABLE:
+	case yarnpb.Instruction_PUSH_VARIABLE:
 		k := instruction.Operands[0].GetStringValue()
 		v, ok := vm.VariableStorage.Get(k)
 		if !ok {
@@ -287,7 +272,7 @@ func (vm *VM) Execute(instruction *bytecode.Instruction, node *bytecode.Node) er
 		}
 		vm.vmState.Push(v)
 
-	case bytecode.Instruction_STORE_VARIABLE:
+	case yarnpb.Instruction_STORE_VARIABLE:
 		k := instruction.Operands[0].GetStringValue()
 		v, err := vm.vmState.Peek()
 		if err != nil {
@@ -299,11 +284,11 @@ func (vm *VM) Execute(instruction *bytecode.Instruction, node *bytecode.Node) er
 		}
 		vm.VariableStorage.Set(k, x)
 
-	case bytecode.Instruction_STOP:
+	case yarnpb.Instruction_STOP:
 		vm.execState = ExecStateStopped
 		// TODO: report execution stopped?
 
-	case bytecode.Instruction_RUN_NODE:
+	case yarnpb.Instruction_RUN_NODE:
 		node := instruction.Operands[0].GetStringValue()
 		if node == "" {
 			// Use the stack, Luke.
@@ -316,7 +301,7 @@ func (vm *VM) Execute(instruction *bytecode.Instruction, node *bytecode.Node) er
 				return fmt.Errorf("wrong type at top of stack [%T != string]", t)
 			}
 			node = n
-		} 
+		}
 		// TODO: completion handler
 		vm.vmState.node = node
 
