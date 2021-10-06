@@ -43,4 +43,6 @@ type Delegate interface {
 	Options(options []string, pickedOption func(option int) error) error
 	// This node is complete
 	NodeComplete(nextNode string)
+	// Dialogue is complete (usually program has stopped)
+	DialogueComplete()
 }

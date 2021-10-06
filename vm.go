@@ -136,7 +136,7 @@ func (vm *VM) Execute(instruction *yarnpb.Instruction, node *yarnpb.Node) error 
 		if !ok {
 			return fmt.Errorf("unknown label %q", k)
 		}
-		vm.vmState.pc = int(pc)
+		vm.vmState.pc = int(pc) - 1
 
 	case yarnpb.Instruction_JUMP:
 		o, err := vm.vmState.Peek()
@@ -151,7 +151,7 @@ func (vm *VM) Execute(instruction *yarnpb.Instruction, node *yarnpb.Node) error 
 		if !ok {
 			return fmt.Errorf("unknown label %q", k)
 		}
-		vm.vmState.pc = int(pc)
+		vm.vmState.pc = int(pc) - 1
 
 	case yarnpb.Instruction_RUN_LINE:
 		k := instruction.Operands[0].GetStringValue()
@@ -214,6 +214,7 @@ func (vm *VM) Execute(instruction *yarnpb.Instruction, node *yarnpb.Node) error 
 			return err
 		}
 		if b {
+			// Value is true, so don't jump
 			return nil
 		}
 		k := instruction.Operands[0].GetStringValue()
@@ -221,7 +222,7 @@ func (vm *VM) Execute(instruction *yarnpb.Instruction, node *yarnpb.Node) error 
 		if !ok {
 			return fmt.Errorf("unknown label %q", k)
 		}
-		vm.vmState.pc = int(pc)
+		vm.vmState.pc = int(pc) - 1
 
 	case yarnpb.Instruction_POP:
 		if _, err := vm.vmState.Pop(); err != nil {
@@ -285,8 +286,9 @@ func (vm *VM) Execute(instruction *yarnpb.Instruction, node *yarnpb.Node) error 
 		vm.VariableStorage.Set(k, x)
 
 	case yarnpb.Instruction_STOP:
+		vm.Delegate.NodeComplete(vm.vmState.node)
+		vm.Delegate.DialogueComplete()
 		vm.execState = ExecStateStopped
-		// TODO: report execution stopped?
 
 	case yarnpb.Instruction_RUN_NODE:
 		node := instruction.Operands[0].GetStringValue()
