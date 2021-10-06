@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 
 	yarnpb "github.com/DrJosh9000/yarn/bytecode"
 )
@@ -45,7 +46,7 @@ const (
 )
 
 type option struct {
-	id   string
+	line Line
 	node string
 }
 
@@ -56,12 +57,12 @@ type state struct {
 	options []option
 }
 
-// Push pushes a value onto the state's stack.
-func (s *state) Push(x interface{}) { s.stack = append(s.stack, x) }
+// push pushes a value onto the state's stack.
+func (s *state) push(x interface{}) { s.stack = append(s.stack, x) }
 
-// Pop removes a value from the stack and returns it.
-func (s *state) Pop() (interface{}, error) {
-	x, err := s.Peek()
+// pop removes a value from the stack and returns it.
+func (s *state) pop() (interface{}, error) {
+	x, err := s.peek()
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +72,7 @@ func (s *state) Pop() (interface{}, error) {
 
 // Reading N strings from the stack is common enough that I made a dedicated
 // helper method for it.
-func (s *state) PopNStrings(n int) ([]string, error) {
+func (s *state) popNStrings(n int) ([]string, error) {
 	if n < 1 {
 		return nil, fmt.Errorf("too few items requested [%d < 1]", n)
 	}
@@ -91,8 +92,8 @@ func (s *state) PopNStrings(n int) ([]string, error) {
 	return ss, nil
 }
 
-// Peek returns the top vaue from the stack only.
-func (s *state) Peek() (interface{}, error) {
+// peek returns the top vaue from the stack only.
+func (s *state) peek() (interface{}, error) {
 	if len(s.stack) == 0 {
 		return nil, errors.New("stack underflow")
 	}
@@ -100,8 +101,8 @@ func (s *state) Peek() (interface{}, error) {
 }
 
 // Peek returns the string form the top of the stack.
-func (s *state) PeekString() (string, error) {
-	x, err := s.Peek()
+func (s *state) peekString() (string, error) {
+	x, err := s.peek()
 	if err != nil {
 		return "", err
 	}
@@ -112,11 +113,9 @@ func (s *state) PeekString() (string, error) {
 	return t, nil
 }
 
-// Clear resets the stack state.
-func (s *state) Clear() { s.stack = nil }
-
 // VirtualMachine implements the virtual machine.
 type VirtualMachine struct {
+	stateMu   sync.RWMutex
 	execState ExecState
 	state     state
 
@@ -129,11 +128,6 @@ type VirtualMachine struct {
 	VariableStorage
 }
 
-// ResetState resets the state of the VM.
-func (vm *VirtualMachine) ResetState() {
-	vm.state = state{}
-}
-
 // SetNode sets the VM to begin a node.
 func (vm *VirtualMachine) SetNode(name string) error {
 	if vm.Program == nil || len(vm.Program.Nodes) == 0 {
@@ -143,8 +137,12 @@ func (vm *VirtualMachine) SetNode(name string) error {
 	if !found {
 		return fmt.Errorf("node %q not found", name)
 	}
-	vm.ResetState()
-	vm.state.node = node
+	// Reset the state and start at this node.
+	vm.stateMu.Lock()
+	vm.state = state{
+		node: node,
+	}
+	vm.stateMu.Unlock()
 	vm.DialogueHandler.NodeStart(name)
 	return nil
 }
@@ -152,20 +150,26 @@ func (vm *VirtualMachine) SetNode(name string) error {
 // SetSelectedOption sets the option selected by the player. Call this once the
 // player has chosen an option. The machine will be returned to Suspended state.
 func (vm *VirtualMachine) SetSelectedOption(index int) error {
+	vm.stateMu.Lock()
+	defer vm.stateMu.Unlock()
 	if vm.execState != WaitingOnOptionSelection {
 		return fmt.Errorf("not waiting for an option selection [m.execState = %d]", vm.execState)
 	}
 	if optslen := len(vm.state.options); index < 0 || index >= optslen {
 		return fmt.Errorf("selected option %d out of bounds [0, %d)", index, optslen)
 	}
-	vm.state.Push(vm.state.options[index].node)
+	vm.state.push(vm.state.options[index].node)
 	vm.state.options = vm.state.options[:0]
 	vm.execState = Suspended
 	return nil
 }
 
 // Stop stops the virtual machine.
-func (vm *VirtualMachine) Stop() { vm.execState = Stopped }
+func (vm *VirtualMachine) Stop() {
+	vm.stateMu.Lock()
+	vm.execState = Stopped
+	vm.stateMu.Unlock()
+}
 
 func (vm *VirtualMachine) Continue() error {
 	if vm.state.node == nil {
@@ -208,13 +212,9 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 		vm.state.pc = int(pc) - 1
 
 	case yarnpb.Instruction_JUMP:
-		o, err := vm.state.Peek()
+		k, err := vm.state.peekString()
 		if err != nil {
 			return err
-		}
-		k, ok := o.(string)
-		if !ok {
-			return fmt.Errorf("wrong type of value at top of stack [%T != string]", o)
 		}
 		pc, ok := vm.state.node.Labels[k]
 		if !ok {
@@ -230,7 +230,7 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 			// Second operand gives number of values on stack to include as
 			// substitutions.
 			// NB: the bytecode only has floats, no ints.
-			ss, err := vm.state.PopNStrings(int(inst.Operands[1].GetFloatValue()))
+			ss, err := vm.state.popNStrings(int(inst.Operands[1].GetFloatValue()))
 			if err != nil {
 				return err
 			}
@@ -246,7 +246,7 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 			// Second operand gives number of values on stack to interpolate
 			// into the command as substitutions.
 			// NB: the bytecode only has floats, no ints.
-			ss, err := vm.state.PopNStrings(int(inst.Operands[1].GetFloatValue()))
+			ss, err := vm.state.popNStrings(int(inst.Operands[1].GetFloatValue()))
 			if err != nil {
 				return err
 			}
@@ -259,8 +259,18 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 		}
 
 	case yarnpb.Instruction_ADD_OPTION:
+		line := Line{
+			ID: inst.Operands[0].GetStringValue(),
+		}
+		if len(inst.Operands) > 2 {
+			ss, err := vm.state.popNStrings(int(inst.Operands[2].GetFloatValue()))
+			if err != nil {
+				return err
+			}
+			line.Substitutions = ss
+		}
 		vm.state.options = append(vm.state.options, option{
-			id:   inst.Operands[0].GetStringValue(),
+			line: line,
 			node: inst.Operands[1].GetStringValue(),
 		})
 
@@ -270,14 +280,11 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 			return ErrNoOptions
 		}
 
-		// TODO: implement shuffling of options depending on configuration?
 		opts := make([]Option, len(vm.state.options))
 		for i, op := range vm.state.options {
 			opts[i] = Option{
-				ID: i,
-				Line: Line{
-					ID: op.id,
-				},
+				ID:              i,
+				Line:            op.line,
 				DestinationNode: op.node,
 			}
 		}
@@ -285,19 +292,19 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 		vm.DialogueHandler.Options(opts)
 
 	case yarnpb.Instruction_PUSH_STRING:
-		vm.state.Push(inst.Operands[0].GetStringValue())
+		vm.state.push(inst.Operands[0].GetStringValue())
 
 	case yarnpb.Instruction_PUSH_FLOAT:
-		vm.state.Push(inst.Operands[0].GetFloatValue())
+		vm.state.push(inst.Operands[0].GetFloatValue())
 
 	case yarnpb.Instruction_PUSH_BOOL:
-		vm.state.Push(inst.Operands[0].GetBoolValue())
+		vm.state.push(inst.Operands[0].GetBoolValue())
 
 	case yarnpb.Instruction_PUSH_NULL:
-		vm.state.Push(nil)
+		vm.state.push(nil)
 
 	case yarnpb.Instruction_JUMP_IF_FALSE:
-		x, err := vm.state.Peek()
+		x, err := vm.state.peek()
 		if err != nil {
 			return err
 		}
@@ -317,7 +324,7 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 		vm.state.pc = int(pc) - 1
 
 	case yarnpb.Instruction_POP:
-		if _, err := vm.state.Pop(); err != nil {
+		if _, err := vm.state.pop(); err != nil {
 			return err
 		}
 
@@ -330,7 +337,7 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 		c := f.ParamCount()
 		if c == -1 {
 			// Variadic, so param count is on stack.
-			x, err := vm.state.Pop()
+			x, err := vm.state.pop()
 			if err != nil {
 				return err
 			}
@@ -343,7 +350,7 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 		params := make([]interface{}, c)
 		for c >= 0 {
 			c--
-			p, err := vm.state.Pop()
+			p, err := vm.state.pop()
 			if err != nil {
 				return err
 			}
@@ -354,7 +361,7 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 			return err
 		}
 		if f.Returns() {
-			vm.state.Push(r)
+			vm.state.push(r)
 		}
 
 	case yarnpb.Instruction_PUSH_VARIABLE:
@@ -363,11 +370,11 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 		if !ok {
 			return fmt.Errorf("no variable called %q", k)
 		}
-		vm.state.Push(v)
+		vm.state.push(v)
 
 	case yarnpb.Instruction_STORE_VARIABLE:
 		k := inst.Operands[0].GetStringValue()
-		v, err := vm.state.Peek()
+		v, err := vm.state.peek()
 		if err != nil {
 			return err
 		}
@@ -386,7 +393,7 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 		node := ""
 		if len(inst.Operands) == 0 || inst.Operands[0].GetStringValue() == "" {
 			// Use the stack, Luke.
-			t, err := vm.state.PeekString()
+			t, err := vm.state.peekString()
 			if err != nil {
 				return err
 			}
