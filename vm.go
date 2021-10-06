@@ -45,16 +45,11 @@ const (
 	Running
 )
 
-type option struct {
-	line Line
-	node string
-}
-
 type state struct {
 	node    *yarnpb.Node // current node
 	pc      int          // program counter
 	stack   []interface{}
-	options []option
+	options []Option
 }
 
 // push pushes a value onto the state's stack.
@@ -158,7 +153,7 @@ func (vm *VirtualMachine) SetSelectedOption(index int) error {
 	if optslen := len(vm.state.options); index < 0 || index >= optslen {
 		return fmt.Errorf("selected option %d out of bounds [0, %d)", index, optslen)
 	}
-	vm.state.push(vm.state.options[index].node)
+	vm.state.push(vm.state.options[index].DestinationNode)
 	vm.state.options = vm.state.options[:0]
 	vm.execState = Suspended
 	return nil
@@ -269,9 +264,10 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 			}
 			line.Substitutions = ss
 		}
-		vm.state.options = append(vm.state.options, option{
-			line: line,
-			node: inst.Operands[1].GetStringValue(),
+		vm.state.options = append(vm.state.options, Option{
+			ID:              len(vm.state.options),
+			Line:            line,
+			DestinationNode: inst.Operands[1].GetStringValue(),
 		})
 
 	case yarnpb.Instruction_SHOW_OPTIONS:
@@ -279,17 +275,8 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 			// NOTE: jon implements this as a machine stop instead of an exception
 			return ErrNoOptions
 		}
-
-		opts := make([]Option, len(vm.state.options))
-		for i, op := range vm.state.options {
-			opts[i] = Option{
-				ID:              i,
-				Line:            op.line,
-				DestinationNode: op.node,
-			}
-		}
 		vm.execState = WaitingOnOptionSelection
-		vm.DialogueHandler.Options(opts)
+		vm.DialogueHandler.Options(vm.state.options)
 
 	case yarnpb.Instruction_PUSH_STRING:
 		vm.state.push(inst.Operands[0].GetStringValue())
