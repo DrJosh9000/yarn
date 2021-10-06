@@ -18,6 +18,7 @@ package yarn // import "github.com/DrJosh9000/yarn"
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"sync"
 
@@ -34,6 +35,8 @@ var (
 	ErrMissingProgram           = errors.New("missing or empty program")
 	ErrNoOptions                = errors.New("no options were added")
 )
+
+var errorType = reflect.TypeOf((*error)(nil)).Elem()
 
 // ExecState is the highest-level machine state.
 type ExecState int
@@ -117,10 +120,9 @@ type VirtualMachine struct {
 	// Program to execute
 	Program *yarnpb.Program
 
-	// Event handlers
-	DialogueHandler
-	Library
-	VariableStorage
+	Handler DialogueHandler
+	Vars    VariableStorage
+	FuncMap map[string]interface{} // works a bit like text/template.FuncMap
 }
 
 // SetNode sets the VM to begin a node.
@@ -138,7 +140,7 @@ func (vm *VirtualMachine) SetNode(name string) error {
 		node: node,
 	}
 	vm.stateMu.Unlock()
-	vm.DialogueHandler.NodeStart(name)
+	vm.Handler.NodeStart(name)
 	return nil
 }
 
@@ -173,10 +175,10 @@ func (vm *VirtualMachine) Continue() error {
 	if vm.execState == WaitingOnOptionSelection {
 		return ErrWaitingOnOptionSelection
 	}
-	if vm.DialogueHandler == nil {
+	if vm.Handler == nil {
 		return ErrNilDialogueHandler
 	}
-	if vm.VariableStorage == nil {
+	if vm.Vars == nil {
 		return ErrNilVariableStorage
 	}
 	vm.execState = Running
@@ -186,9 +188,9 @@ func (vm *VirtualMachine) Continue() error {
 		}
 		vm.state.pc++
 		if proglen := len(vm.state.node.Instructions); vm.state.pc >= proglen {
-			vm.DialogueHandler.NodeComplete(vm.state.node.Name)
+			vm.Handler.NodeComplete(vm.state.node.Name)
 			vm.execState = Stopped
-			vm.DialogueHandler.DialogueComplete()
+			vm.Handler.DialogueComplete()
 		}
 	}
 	return nil
@@ -231,7 +233,7 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 			}
 			line.Substitutions = ss
 		}
-		if vm.Line(line) == PauseExecution {
+		if vm.Handler.Line(line) == PauseExecution {
 			vm.execState = Suspended
 		}
 
@@ -249,7 +251,7 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 				cmd = strings.Replace(cmd, fmt.Sprintf("{%d}", i), s, -1)
 			}
 		}
-		if vm.Command(cmd) == PauseExecution {
+		if vm.Handler.Command(cmd) == PauseExecution {
 			vm.execState = Suspended
 		}
 
@@ -276,7 +278,7 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 			return ErrNoOptions
 		}
 		vm.execState = WaitingOnOptionSelection
-		vm.DialogueHandler.Options(vm.state.options)
+		vm.Handler.Options(vm.state.options)
 
 	case yarnpb.Instruction_PUSH_STRING:
 		vm.state.push(inst.Operands[0].GetStringValue())
@@ -316,44 +318,68 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 		}
 
 	case yarnpb.Instruction_CALL_FUNC:
+		// TODO: typecheck FuncMap during preprocessing
+		// TODO: a lot of this is very forgiving...
 		k := inst.Operands[0].GetStringValue()
-		f, err := vm.Library.Function(k)
+		f, found := vm.FuncMap[k]
+		if !found {
+			return fmt.Errorf("function %q not found", k)
+		}
+		ft := reflect.TypeOf(f)
+		if ft.Kind() != reflect.Func {
+			return fmt.Errorf("function %q not actually a function [type %T]", k, f)
+		}
+		// Compiler puts number of args on top of stack
+		gotx, err := vm.state.pop()
 		if err != nil {
 			return err
 		}
-		c := f.ParamCount()
-		if c == -1 {
-			// Variadic, so param count is on stack.
-			x, err := vm.state.pop()
-			if err != nil {
-				return err
-			}
-			y, err := convertToInt(x)
-			if err != nil {
-				return err
-			}
-			c = y
+		got, err := convertToInt(gotx)
+		if err != nil {
+			return err
 		}
-		params := make([]interface{}, c)
-		for c >= 0 {
-			c--
+		// Check that we have enough args to call the func
+		switch want := ft.NumIn(); {
+		case ft.IsVariadic() && got < want-1:
+			// The last (variadic) arg is free to be empty.
+			return fmt.Errorf("insufficient args [%d < %d]", got, want)
+		case got != want:
+			return fmt.Errorf("wrong number of args [%d != %d]", got, want)
+		}
+
+		// Also check that f either returns {0,1,2} values; the second is
+		// only allowed to be type error.
+		switch {
+		case ft.NumOut() == 2 && ft.Out(1) == errorType:
+			// ok
+		case ft.NumOut() < 2:
+			// ok
+		default:
+			// TODO: elaborate in message
+			return errors.New("wrong number or type of return args")
+		}
+
+		params := make([]reflect.Value, got)
+		for got >= 0 {
+			got--
 			p, err := vm.state.pop()
 			if err != nil {
 				return err
 			}
-			params[c] = p
+			params[got] = reflect.ValueOf(p)
 		}
-		r, err := f.Invoke(params...)
-		if err != nil {
-			return err
+
+		result := reflect.ValueOf(f).Call(params)
+		if len(result) == 2 && !result[1].IsNil() {
+			return result[1].Interface().(error)
 		}
-		if f.Returns() {
-			vm.state.push(r)
+		if len(result) > 0 {
+			vm.state.push(result[0].Interface())
 		}
 
 	case yarnpb.Instruction_PUSH_VARIABLE:
 		k := inst.Operands[0].GetStringValue()
-		v, ok := vm.VariableStorage.GetValue(k)
+		v, ok := vm.Vars.GetValue(k)
 		if !ok {
 			return fmt.Errorf("no variable called %q", k)
 		}
@@ -369,11 +395,11 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 		if err != nil {
 			return err
 		}
-		vm.VariableStorage.SetValue(k, x)
+		vm.Vars.SetValue(k, x)
 
 	case yarnpb.Instruction_STOP:
-		vm.DialogueHandler.NodeComplete(vm.state.node.Name)
-		vm.DialogueHandler.DialogueComplete()
+		vm.Handler.NodeComplete(vm.state.node.Name)
+		vm.Handler.DialogueComplete()
 		vm.execState = Stopped
 
 	case yarnpb.Instruction_RUN_NODE:
@@ -388,7 +414,7 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 		} else {
 			node = inst.Operands[0].GetStringValue()
 		}
-		pause := vm.DialogueHandler.NodeComplete(vm.state.node.Name)
+		pause := vm.Handler.NodeComplete(vm.state.node.Name)
 		if err := vm.SetNode(node); err != nil {
 			return err
 		}
