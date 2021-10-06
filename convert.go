@@ -55,7 +55,7 @@ func convertToInt(x interface{}) (int, error) {
 	case int:
 		return t, nil
 	case string:
-		i, err := strconv.ParseInt(t, 10, 64)
+		i, err := strconv.Atoi(t)
 		return int(i), err
 	default:
 		if t == nil {

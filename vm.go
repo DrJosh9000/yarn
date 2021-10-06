@@ -18,36 +18,49 @@ package yarn // import "github.com/DrJosh9000/yarn"
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	yarnpb "github.com/DrJosh9000/yarn/bytecode"
 )
 
 // BUG: This package hasn't been used or tested yet, and is incomplete.
 
+var (
+	ErrNoNodeSelected           = errors.New("no node selected to run")
+	ErrWaitingOnOptionSelection = errors.New("waiting on option selection")
+	ErrNilDialogueHandler       = errors.New("nil dialogue handler")
+	ErrNilVariableStorage       = errors.New("nil variable storage")
+	ErrMissingProgram           = errors.New("missing or empty program")
+	ErrNoOptions                = errors.New("no options were added")
+)
+
 // ExecState is the highest-level machine state.
 type ExecState int
 
 const (
-	ExecStateStopped = ExecState(iota)
-	ExecStateWaitOnOptionSelection
-	ExecStateRunning
+	Stopped = ExecState(iota)
+	WaitingOnOptionSelection
+	Suspended
+	Running
 )
 
-type option struct{ id, node string }
+type option struct {
+	id   string
+	node string
+}
 
-// VMState models a machine state.
-type VMState struct {
-	node    string
-	pc      int
+type state struct {
+	node    *yarnpb.Node // current node
+	pc      int          // program counter
 	stack   []interface{}
 	options []option
 }
 
 // Push pushes a value onto the state's stack.
-func (s *VMState) Push(x interface{}) { s.stack = append(s.stack, x) }
+func (s *state) Push(x interface{}) { s.stack = append(s.stack, x) }
 
 // Pop removes a value from the stack and returns it.
-func (s *VMState) Pop() (interface{}, error) {
+func (s *state) Pop() (interface{}, error) {
 	x, err := s.Peek()
 	if err != nil {
 		return nil, err
@@ -56,90 +69,146 @@ func (s *VMState) Pop() (interface{}, error) {
 	return x, nil
 }
 
+// Reading N strings from the stack is common enough that I made a dedicated
+// helper method for it.
+func (s *state) PopNStrings(n int) ([]string, error) {
+	if n < 1 {
+		return nil, fmt.Errorf("too few items requested [%d < 1]", n)
+	}
+	if n > len(s.stack) {
+		return nil, fmt.Errorf("stack underflow [%d > %d]", n, len(s.stack))
+	}
+	rem := len(s.stack) - n
+	ss := make([]string, n)
+	for i, x := range s.stack[rem:] {
+		t, ok := x.(string)
+		if !ok {
+			return nil, fmt.Errorf("wrong type from stack [%T != string]", x)
+		}
+		ss[i] = t
+	}
+	s.stack = s.stack[:rem]
+	return ss, nil
+}
+
 // Peek returns the top vaue from the stack only.
-func (s *VMState) Peek() (interface{}, error) {
+func (s *state) Peek() (interface{}, error) {
 	if len(s.stack) == 0 {
 		return nil, errors.New("stack underflow")
 	}
 	return s.stack[len(s.stack)-1], nil
 }
 
+// Peek returns the string form the top of the stack.
+func (s *state) PeekString() (string, error) {
+	x, err := s.Peek()
+	if err != nil {
+		return "", err
+	}
+	t, ok := x.(string)
+	if !ok {
+		return "", fmt.Errorf("wrong type at top of stack [%T != string]", x)
+	}
+	return t, nil
+}
+
 // Clear resets the stack state.
-func (s *VMState) Clear() { s.stack = nil }
+func (s *state) Clear() { s.stack = nil }
 
-// VM implements the virtual machine.
-type VM struct {
+// VirtualMachine implements the virtual machine.
+type VirtualMachine struct {
 	execState ExecState
-	program   *yarnpb.Program
-	vmState   *VMState
+	state     state
 
-	Delegate
+	// Program to execute
+	Program *yarnpb.Program
+
+	// Event handlers
+	DialogueHandler
 	Library
 	VariableStorage
 }
 
-// Stop stops the virtual machine.
-func (vm *VM) Stop() { vm.execState = ExecStateStopped }
+// ResetState resets the state of the VM.
+func (vm *VirtualMachine) ResetState() {
+	vm.state = state{}
+}
 
-// RunNext executes the next instruction in the current node.
-func (vm *VM) RunNext() error {
-	switch vm.execState {
-	case ExecStateStopped:
-		vm.execState = ExecStateRunning
-	case ExecStateWaitOnOptionSelection:
-		return errors.New("cannot run, waiting on option selection")
+// SetNode sets the VM to begin a node.
+func (vm *VirtualMachine) SetNode(name string) error {
+	if vm.Program == nil || len(vm.Program.Nodes) == 0 {
+		return ErrMissingProgram
 	}
-	if vm.Delegate == nil {
-		return errors.New("delegate is nil")
+	node, found := vm.Program.Nodes[name]
+	if !found {
+		return fmt.Errorf("node %q not found", name)
 	}
-	if vm.VariableStorage == nil {
-		return errors.New("variable storage is nil")
-	}
-	node, ok := vm.program.Nodes[vm.vmState.node]
-	if !ok {
-		return fmt.Errorf("illegal state; unknown node of program %q", vm.vmState.node)
-	}
-	if vm.vmState.pc < 0 || vm.vmState.pc >= len(node.Instructions) {
-		return fmt.Errorf("illegal state; pc %d outside program [0, %d)", vm.vmState.pc, len(node.Instructions))
-	}
-	ins := node.Instructions[vm.vmState.pc]
-	if err := vm.Execute(ins, node); err != nil {
-		return err
-	}
-	vm.vmState.pc++
-	if vm.vmState.pc >= len(node.Instructions) {
-		vm.execState = ExecStateStopped
-	}
+	vm.ResetState()
+	vm.state.node = node
+	vm.DialogueHandler.NodeStart(name)
 	return nil
 }
 
-func (vm *VM) optionPicked(i int) error {
-	if vm.execState != ExecStateWaitOnOptionSelection {
-		return fmt.Errorf("machine is not waiting for an option selection [m.execState = %d]", vm.execState)
+// SetSelectedOption sets the option selected by the player. Call this once the
+// player has chosen an option. The machine will be returned to Suspended state.
+func (vm *VirtualMachine) SetSelectedOption(index int) error {
+	if vm.execState != WaitingOnOptionSelection {
+		return fmt.Errorf("not waiting for an option selection [m.execState = %d]", vm.execState)
 	}
-	if i < 0 || i >= len(vm.vmState.options) {
-		return fmt.Errorf("selected option %d out of bounds [0, %d)", i, len(vm.vmState.options))
+	if optslen := len(vm.state.options); index < 0 || index >= optslen {
+		return fmt.Errorf("selected option %d out of bounds [0, %d)", index, optslen)
 	}
-	vm.vmState.Push(vm.vmState.options[i].node)
-	vm.vmState.options = nil
-	vm.execState = ExecStateRunning
+	vm.state.Push(vm.state.options[index].node)
+	vm.state.options = vm.state.options[:0]
+	vm.execState = Suspended
+	return nil
+}
+
+// Stop stops the virtual machine.
+func (vm *VirtualMachine) Stop() { vm.execState = Stopped }
+
+func (vm *VirtualMachine) Continue() error {
+	if vm.state.node == nil {
+		return ErrNoNodeSelected
+	}
+	if vm.execState == WaitingOnOptionSelection {
+		return ErrWaitingOnOptionSelection
+	}
+	if vm.DialogueHandler == nil {
+		return ErrNilDialogueHandler
+	}
+	if vm.VariableStorage == nil {
+		return ErrNilVariableStorage
+	}
+	vm.execState = Running
+	for vm.execState == Running {
+		if err := vm.Execute(vm.state.node.Instructions[vm.state.pc]); err != nil {
+			return err
+		}
+		vm.state.pc++
+		if proglen := len(vm.state.node.Instructions); vm.state.pc >= proglen {
+			vm.DialogueHandler.NodeComplete(vm.state.node.Name)
+			vm.execState = Stopped
+			vm.DialogueHandler.DialogueComplete()
+		}
+	}
 	return nil
 }
 
 // Execute executes a single instruction.
-func (vm *VM) Execute(instruction *yarnpb.Instruction, node *yarnpb.Node) error {
-	switch instruction.Opcode {
+func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
+	switch inst.Opcode {
 
 	case yarnpb.Instruction_JUMP_TO:
-		k := instruction.Operands[0].GetStringValue()
-		pc, ok := node.Labels[k]
+		k := inst.Operands[0].GetStringValue()
+		pc, ok := vm.state.node.Labels[k]
 		if !ok {
 			return fmt.Errorf("unknown label %q", k)
 		}
-		vm.vmState.pc = int(pc) - 1
+		vm.state.pc = int(pc) - 1
 
 	case yarnpb.Instruction_JUMP:
-		o, err := vm.vmState.Peek()
+		o, err := vm.state.Peek()
 		if err != nil {
 			return err
 		}
@@ -147,65 +216,88 @@ func (vm *VM) Execute(instruction *yarnpb.Instruction, node *yarnpb.Node) error 
 		if !ok {
 			return fmt.Errorf("wrong type of value at top of stack [%T != string]", o)
 		}
-		pc, ok := node.Labels[k]
+		pc, ok := vm.state.node.Labels[k]
 		if !ok {
 			return fmt.Errorf("unknown label %q", k)
 		}
-		vm.vmState.pc = int(pc) - 1
+		vm.state.pc = int(pc) - 1
 
 	case yarnpb.Instruction_RUN_LINE:
-		k := instruction.Operands[0].GetStringValue()
-		if err := vm.Line(k); err != nil {
-			return err
+		line := Line{
+			ID: inst.Operands[0].GetStringValue(),
+		}
+		if len(inst.Operands) > 1 {
+			// Second operand gives number of values on stack to include as
+			// substitutions.
+			// NB: the bytecode only has floats, no ints.
+			ss, err := vm.state.PopNStrings(int(inst.Operands[1].GetFloatValue()))
+			if err != nil {
+				return err
+			}
+			line.Substitutions = ss
+		}
+		if vm.Line(line) == PauseExecution {
+			vm.execState = Suspended
 		}
 
 	case yarnpb.Instruction_RUN_COMMAND:
-		a := instruction.Operands[0].GetStringValue()
-		if err := vm.Command(a); err != nil {
-			return err
+		cmd := inst.Operands[0].GetStringValue()
+		if len(inst.Operands) > 1 {
+			// Second operand gives number of values on stack to interpolate
+			// into the command as substitutions.
+			// NB: the bytecode only has floats, no ints.
+			ss, err := vm.state.PopNStrings(int(inst.Operands[1].GetFloatValue()))
+			if err != nil {
+				return err
+			}
+			for i, s := range ss {
+				cmd = strings.Replace(cmd, fmt.Sprintf("{%d}", i), s, -1)
+			}
+		}
+		if vm.Command(cmd) == PauseExecution {
+			vm.execState = Suspended
 		}
 
 	case yarnpb.Instruction_ADD_OPTION:
-		vm.vmState.options = append(vm.vmState.options, option{
-			id:   instruction.Operands[0].GetStringValue(),
-			node: instruction.Operands[1].GetStringValue(),
+		vm.state.options = append(vm.state.options, option{
+			id:   inst.Operands[0].GetStringValue(),
+			node: inst.Operands[1].GetStringValue(),
 		})
 
 	case yarnpb.Instruction_SHOW_OPTIONS:
-		switch len(vm.vmState.options) {
-		case 0:
+		if len(vm.state.options) == 0 {
 			// NOTE: jon implements this as a machine stop instead of an exception
-			return errors.New("illegal state, no options to show")
-		case 1:
-			vm.vmState.Push(vm.vmState.options[0].node)
-			vm.vmState.options = nil
-			return nil
+			return ErrNoOptions
 		}
-		// TODO: implement shuffling of options depending on configuration.
-		ops := make([]string, 0, len(vm.vmState.options))
-		for _, op := range vm.vmState.options {
-			ops = append(ops, op.id)
+
+		// TODO: implement shuffling of options depending on configuration?
+		opts := make([]Option, len(vm.state.options))
+		for i, op := range vm.state.options {
+			opts[i] = Option{
+				ID: i,
+				Line: Line{
+					ID: op.id,
+				},
+				DestinationNode: op.node,
+			}
 		}
-		vm.execState = ExecStateWaitOnOptionSelection
-		if err := vm.Options(ops, vm.optionPicked); err != nil {
-			return err
-		}
+		vm.execState = WaitingOnOptionSelection
+		vm.DialogueHandler.Options(opts)
 
 	case yarnpb.Instruction_PUSH_STRING:
-		a := instruction.Operands[0].GetStringValue()
-		vm.vmState.Push(a)
+		vm.state.Push(inst.Operands[0].GetStringValue())
 
 	case yarnpb.Instruction_PUSH_FLOAT:
-		vm.vmState.Push(instruction.Operands[0].GetFloatValue())
+		vm.state.Push(inst.Operands[0].GetFloatValue())
 
 	case yarnpb.Instruction_PUSH_BOOL:
-		vm.vmState.Push(instruction.Operands[0].GetBoolValue())
+		vm.state.Push(inst.Operands[0].GetBoolValue())
 
 	case yarnpb.Instruction_PUSH_NULL:
-		vm.vmState.Push(nil)
+		vm.state.Push(nil)
 
 	case yarnpb.Instruction_JUMP_IF_FALSE:
-		x, err := vm.vmState.Peek()
+		x, err := vm.state.Peek()
 		if err != nil {
 			return err
 		}
@@ -217,20 +309,20 @@ func (vm *VM) Execute(instruction *yarnpb.Instruction, node *yarnpb.Node) error 
 			// Value is true, so don't jump
 			return nil
 		}
-		k := instruction.Operands[0].GetStringValue()
-		pc, ok := node.Labels[k]
+		k := inst.Operands[0].GetStringValue()
+		pc, ok := vm.state.node.Labels[k]
 		if !ok {
 			return fmt.Errorf("unknown label %q", k)
 		}
-		vm.vmState.pc = int(pc) - 1
+		vm.state.pc = int(pc) - 1
 
 	case yarnpb.Instruction_POP:
-		if _, err := vm.vmState.Pop(); err != nil {
+		if _, err := vm.state.Pop(); err != nil {
 			return err
 		}
 
 	case yarnpb.Instruction_CALL_FUNC:
-		k := instruction.Operands[0].GetStringValue()
+		k := inst.Operands[0].GetStringValue()
 		f, err := vm.Library.Function(k)
 		if err != nil {
 			return err
@@ -238,20 +330,20 @@ func (vm *VM) Execute(instruction *yarnpb.Instruction, node *yarnpb.Node) error 
 		c := f.ParamCount()
 		if c == -1 {
 			// Variadic, so param count is on stack.
-			x, err := vm.vmState.Pop()
+			x, err := vm.state.Pop()
 			if err != nil {
 				return err
 			}
-			y, ok := x.(int)
-			if !ok {
-				return fmt.Errorf("wrong type popped from stack [%T != int]", x)
+			y, err := convertToInt(x)
+			if err != nil {
+				return err
 			}
 			c = y
 		}
 		params := make([]interface{}, c)
 		for c >= 0 {
 			c--
-			p, err := vm.vmState.Pop()
+			p, err := vm.state.Pop()
 			if err != nil {
 				return err
 			}
@@ -262,20 +354,20 @@ func (vm *VM) Execute(instruction *yarnpb.Instruction, node *yarnpb.Node) error 
 			return err
 		}
 		if f.Returns() {
-			vm.vmState.Push(r)
+			vm.state.Push(r)
 		}
 
 	case yarnpb.Instruction_PUSH_VARIABLE:
-		k := instruction.Operands[0].GetStringValue()
-		v, ok := vm.VariableStorage.Get(k)
+		k := inst.Operands[0].GetStringValue()
+		v, ok := vm.VariableStorage.GetValue(k)
 		if !ok {
 			return fmt.Errorf("no variable called %q", k)
 		}
-		vm.vmState.Push(v)
+		vm.state.Push(v)
 
 	case yarnpb.Instruction_STORE_VARIABLE:
-		k := instruction.Operands[0].GetStringValue()
-		v, err := vm.vmState.Peek()
+		k := inst.Operands[0].GetStringValue()
+		v, err := vm.state.Peek()
 		if err != nil {
 			return err
 		}
@@ -283,32 +375,35 @@ func (vm *VM) Execute(instruction *yarnpb.Instruction, node *yarnpb.Node) error 
 		if err != nil {
 			return err
 		}
-		vm.VariableStorage.Set(k, x)
+		vm.VariableStorage.SetValue(k, x)
 
 	case yarnpb.Instruction_STOP:
-		vm.Delegate.NodeComplete(vm.vmState.node)
-		vm.Delegate.DialogueComplete()
-		vm.execState = ExecStateStopped
+		vm.DialogueHandler.NodeComplete(vm.state.node.Name)
+		vm.DialogueHandler.DialogueComplete()
+		vm.execState = Stopped
 
 	case yarnpb.Instruction_RUN_NODE:
-		node := instruction.Operands[0].GetStringValue()
-		if node == "" {
+		node := ""
+		if len(inst.Operands) == 0 || inst.Operands[0].GetStringValue() == "" {
 			// Use the stack, Luke.
-			t, err := vm.vmState.Peek()
+			t, err := vm.state.PeekString()
 			if err != nil {
 				return err
 			}
-			n, ok := t.(string)
-			if !ok {
-				return fmt.Errorf("wrong type at top of stack [%T != string]", t)
-			}
-			node = n
+			node = t
+		} else {
+			node = inst.Operands[0].GetStringValue()
 		}
-		// TODO: completion handler
-		vm.vmState.node = node
+		pause := vm.DialogueHandler.NodeComplete(vm.state.node.Name)
+		if err := vm.SetNode(node); err != nil {
+			return err
+		}
+		if pause == PauseExecution {
+			vm.execState = Suspended
+		}
 
 	default:
-		return fmt.Errorf("invalid instruction %v", instruction)
+		return fmt.Errorf("invalid opcode %v", inst.Opcode)
 	}
 	return nil
 }
