@@ -49,6 +49,14 @@ var (
 	// ErrNoOptions indicates the program is invalid - it tried to show options
 	// but none had been added.
 	ErrNoOptions = errors.New("no options were added")
+
+	// ErrStackUnderflow indicates the program tried to pop or peek when the
+	// stack was empty.
+	ErrStackUnderflow = errors.New("stack underflow")
+
+	// ErrWrongType indicates the program needed a value of one type, but got
+	// something else instead.
+	ErrWrongType = errors.New("wrong type")
 )
 
 // Used to check the second return arg of functions in FuncMap.
@@ -164,8 +172,10 @@ func (vm *VirtualMachine) Continue() error {
 	}
 	vm.execState = running
 	for vm.execState == running {
-		if err := vm.execute(vm.state.node.Instructions[vm.state.pc]); err != nil {
-			return err
+		pc := vm.state.pc
+		inst := vm.state.node.Instructions[pc]
+		if err := vm.execute(inst); err != nil {
+			return fmt.Errorf("executing %v at %d: %w", inst, pc, err)
 		}
 		vm.state.pc++
 		if proglen := len(vm.state.node.Instructions); vm.state.pc >= proglen {
@@ -186,7 +196,7 @@ func (vm *VirtualMachine) execute(inst *yarnpb.Instruction) error {
 		k := inst.Operands[0].GetStringValue()
 		pc, ok := vm.state.node.Labels[k]
 		if !ok {
-			return fmt.Errorf("unknown label %q", k)
+			return fmt.Errorf("unknown label %q in node %q", k, vm.state.node.Name)
 		}
 		vm.state.pc = int(pc) - 1
 
@@ -200,7 +210,7 @@ func (vm *VirtualMachine) execute(inst *yarnpb.Instruction) error {
 		}
 		pc, ok := vm.state.node.Labels[k]
 		if !ok {
-			return fmt.Errorf("unknown label %q", k)
+			return fmt.Errorf("unknown label %q in node %q", k, vm.state.node.Name)
 		}
 		vm.state.pc = int(pc) - 1
 
@@ -216,11 +226,11 @@ func (vm *VirtualMachine) execute(inst *yarnpb.Instruction) error {
 			// NB: the bytecode only has floats, no ints.
 			n, err := operandToInt(inst.Operands[1])
 			if err != nil {
-				return err
+				return fmt.Errorf("operandToInt(opB): %w", err)
 			}
 			ss, err := vm.state.popNStrings(n)
 			if err != nil {
-				return err
+				return fmt.Errorf("popNStrings(%d): %w", n, err)
 			}
 			line.Substitutions = ss
 		}
@@ -240,11 +250,11 @@ func (vm *VirtualMachine) execute(inst *yarnpb.Instruction) error {
 			// NB: the bytecode only has floats, no ints.
 			n, err := operandToInt(inst.Operands[1])
 			if err != nil {
-				return err
+				return fmt.Errorf("operandToInt(opB): %w", err)
 			}
 			ss, err := vm.state.popNStrings(n)
 			if err != nil {
-				return err
+				return fmt.Errorf("popNStrings(%d): %w", n, err)
 			}
 			for i, s := range ss {
 				cmd = strings.Replace(cmd, fmt.Sprintf("{%d}", i), s, -1)
@@ -271,11 +281,11 @@ func (vm *VirtualMachine) execute(inst *yarnpb.Instruction) error {
 		if len(inst.Operands) > 2 {
 			n, err := operandToInt(inst.Operands[2])
 			if err != nil {
-				return err
+				return fmt.Errorf("operandToInt(opC): %w", err)
 			}
 			ss, err := vm.state.popNStrings(n)
 			if err != nil {
-				return err
+				return fmt.Errorf("popNStrings(%d): %w", n, err)
 			}
 			line.Substitutions = ss
 		}
@@ -339,11 +349,11 @@ func (vm *VirtualMachine) execute(inst *yarnpb.Instruction) error {
 		// opA = string: label name
 		x, err := vm.state.peek()
 		if err != nil {
-			return err
+			return fmt.Errorf("peek: %w", err)
 		}
 		b, err := convertToBool(x)
 		if err != nil {
-			return err
+			return fmt.Errorf("convertToBool: %w", err)
 		}
 		if b {
 			// Value is true, so don't jump
@@ -360,7 +370,7 @@ func (vm *VirtualMachine) execute(inst *yarnpb.Instruction) error {
 		// Discards top of stack.
 		// No operands.
 		if _, err := vm.state.pop(); err != nil {
-			return err
+			return fmt.Errorf("pop: %w", err)
 		}
 
 	case yarnpb.Instruction_CALL_FUNC:
@@ -383,11 +393,11 @@ func (vm *VirtualMachine) execute(inst *yarnpb.Instruction) error {
 		// Compiler puts number of args on top of stack
 		gotx, err := vm.state.pop()
 		if err != nil {
-			return err
+			return fmt.Errorf("pop: %w", err)
 		}
 		got, err := convertToInt(gotx)
 		if err != nil {
-			return err
+			return fmt.Errorf("convertToInt: %w", err)
 		}
 		// Check that we have enough args to call the func
 		switch want := ft.NumIn(); {
@@ -415,7 +425,7 @@ func (vm *VirtualMachine) execute(inst *yarnpb.Instruction) error {
 			got--
 			p, err := vm.state.pop()
 			if err != nil {
-				return err
+				return fmt.Errorf("pop: %w", err)
 			}
 			params[got] = reflect.ValueOf(p)
 		}
@@ -440,7 +450,7 @@ func (vm *VirtualMachine) execute(inst *yarnpb.Instruction) error {
 		// Is it provided as an initial value?
 		w, ok := vm.Program.InitialValues[k]
 		if !ok {
-			return fmt.Errorf("no variable called %q", k)
+			return fmt.Errorf("no variable %q in storage or initial values", k)
 		}
 		switch x := w.Value.(type) {
 		case *yarnpb.Operand_BoolValue:
@@ -458,7 +468,7 @@ func (vm *VirtualMachine) execute(inst *yarnpb.Instruction) error {
 		k := inst.Operands[0].GetStringValue()
 		v, err := vm.state.peek()
 		if err != nil {
-			return err
+			return fmt.Errorf("peek: %w", err)
 		}
 		vm.Vars.SetValue(k, v)
 
@@ -475,11 +485,11 @@ func (vm *VirtualMachine) execute(inst *yarnpb.Instruction) error {
 		// No operands.
 		node, err := vm.state.popString()
 		if err != nil {
-			return err
+			return fmt.Errorf("popString: %w", err)
 		}
 		vm.Handler.NodeComplete(vm.state.node.Name)
 		if err := vm.SetNode(node); err != nil {
-			return err
+			return fmt.Errorf("SetNode: %w", err)
 		}
 		vm.state.pc--
 
@@ -501,6 +511,7 @@ func (s *state) push(x interface{}) { s.stack = append(s.stack, x) }
 
 // pop removes a value from the stack and returns it.
 func (s *state) pop() (interface{}, error) {
+	// pop = (peek and then chuck out the top)
 	x, err := s.peek()
 	if err != nil {
 		return nil, err
@@ -516,7 +527,7 @@ func (s *state) popBool() (bool, error) {
 	}
 	b, ok := x.(bool)
 	if !ok {
-		return false, fmt.Errorf("wrong type popped from stack [%T != bool]", x)
+		return false, fmt.Errorf("%w from stack [%T != bool]", ErrWrongType, x)
 	}
 	return b, nil
 }
@@ -528,7 +539,7 @@ func (s *state) popString() (string, error) {
 	}
 	t, ok := x.(string)
 	if !ok {
-		return "", fmt.Errorf("wrong type popped from stack [%T != string]", x)
+		return "", fmt.Errorf("%w from stack [%T != string]", ErrWrongType, x)
 	}
 	return t, nil
 }
@@ -536,18 +547,21 @@ func (s *state) popString() (string, error) {
 // Reading N strings from the stack is common enough that I made a dedicated
 // helper method for it.
 func (s *state) popNStrings(n int) ([]string, error) {
-	if n < 1 {
-		return nil, fmt.Errorf("too few items requested [%d < 1]", n)
+	if n < 0 {
+		return nil, fmt.Errorf("popping %d items", n)
+	}
+	if n == 0 {
+		return nil, nil
 	}
 	if n > len(s.stack) {
-		return nil, fmt.Errorf("stack underflow [%d > %d]", n, len(s.stack))
+		return nil, fmt.Errorf("%w [%d > %d]", ErrStackUnderflow, n, len(s.stack))
 	}
 	rem := len(s.stack) - n
 	ss := make([]string, n)
 	for i, x := range s.stack[rem:] {
 		t, ok := x.(string)
 		if !ok {
-			return nil, fmt.Errorf("wrong type from stack [%T != string]", x)
+			return nil, fmt.Errorf("%w from stack [%T != string]", ErrWrongType, x)
 		}
 		ss[i] = t
 	}
@@ -558,7 +572,7 @@ func (s *state) popNStrings(n int) ([]string, error) {
 // peek returns the top vaue from the stack only.
 func (s *state) peek() (interface{}, error) {
 	if len(s.stack) == 0 {
-		return nil, errors.New("stack underflow")
+		return nil, ErrStackUnderflow
 	}
 	return s.stack[len(s.stack)-1], nil
 }
@@ -571,7 +585,7 @@ func (s *state) peekString() (string, error) {
 	}
 	t, ok := x.(string)
 	if !ok {
-		return "", fmt.Errorf("wrong type at top of stack [%T != string]", x)
+		return "", fmt.Errorf("%w from stack [%T != string]", ErrWrongType, x)
 	}
 	return t, nil
 }
