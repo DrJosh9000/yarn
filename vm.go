@@ -18,6 +18,7 @@ package yarn // import "github.com/DrJosh9000/yarn"
 import (
 	"errors"
 	"fmt"
+	"log"
 	"reflect"
 	"strings"
 	"sync"
@@ -93,9 +94,13 @@ type VirtualMachine struct {
 	// Program to execute
 	Program *yarnpb.Program
 
+	// Handlers / callbacks
 	Handler DialogueHandler
 	Vars    VariableStorage
 	FuncMap map[string]interface{} // works a bit like text/template.FuncMap
+
+	// Debugging options
+	TraceLog bool
 }
 
 // SetNode sets the VM to begin a node.
@@ -178,6 +183,11 @@ func (vm *VirtualMachine) Continue() error {
 	for vm.execState == running {
 		pc := vm.state.pc
 		inst := vm.state.node.Instructions[pc]
+		if vm.TraceLog {
+			log.Printf("node %q pc %d %s %v", vm.state.node.Name, pc, inst.Opcode, inst.Operands)
+			log.Printf("stack %q", vm.state.stack)
+			log.Printf("options %v", vm.state.options)
+		}
 		if err := vm.execute(inst); err != nil {
 			return fmt.Errorf("executing %v at %d: %w", inst, pc, err)
 		}
