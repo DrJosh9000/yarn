@@ -69,7 +69,7 @@ const (
 	waitingForContinue
 
 	// The VirtualMachine is delivering a line, options, or a
-	// commmand to the client game.
+	// command to the client game.
 	deliveringContent
 
 	// The VirtualMachine is in the middle of executing code.
