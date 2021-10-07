@@ -34,40 +34,32 @@ type Option struct {
 
 	// Name of the node to run if this option is selected.
 	DestinationNode string
+
+	// Indicates whether the player should be permitted to select the option,
+	// e.g. for an option that the player _could_ have taken if they had
+	// satisfied some prerequisite earlier on.
+	IsAvailable bool
 }
-
-// HandlerExecutionType values control what the dialogue system does when
-// control is passed to a handler.
-type HandlerExecutionType int
-
-const (
-	// The dialogue system should suspend execution during the handler.
-	PauseExecution = HandlerExecutionType(iota)
-
-	// The dialogue system should continue executing.
-	ContinueExecution
-)
 
 // DialogueHandler receives events from the VM.
 type DialogueHandler interface {
 	// Line is called when the dialogue system runs a line of dialogue.
-	Line(Line) HandlerExecutionType
+	Line(Line)
 
 	// Options is called to deliver a set of options to the game. The player
-	// should choose one of the options. The dialogue system must always wait
-	// for an option to be chosen before continuing.
+	// should choose one of the options.
 	Options([]Option)
 
 	// Command is called when the dialogue system runs a command.
-	Command(command string) HandlerExecutionType
+	Command(command string)
 
 	// NodeStart is called when a node has begun executing. It is passed the
 	// name of the node.
-	NodeStart(nodeName string) HandlerExecutionType
+	NodeStart(nodeName string)
 
 	// NodeComplete is called when a node has completed execution. It is passed
 	// the name of the node.
-	NodeComplete(nodeName string) HandlerExecutionType
+	NodeComplete(nodeName string)
 
 	// DialogueComplete is called when the dialogue as a whole is complete.
 	DialogueComplete()

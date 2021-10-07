@@ -15,8 +15,11 @@
 package yarn
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
+
+	yarnpb "github.com/DrJosh9000/yarn/bytecode"
 )
 
 func convertToBool(x interface{}) (bool, error) {
@@ -86,4 +89,15 @@ func convertToFloat(x interface{}) (float64, error) {
 		}
 		return 0.0, fmt.Errorf("cannot convert value of type %T to float64", x)
 	}
+}
+
+func operandToInt(op *yarnpb.Operand) (int, error) {
+	if op == nil {
+		return 0, errors.New("nil operand")
+	}
+	f, ok := op.Value.(*yarnpb.Operand_FloatValue)
+	if !ok {
+		return 0, fmt.Errorf("wrong operand type [%T != Operand_FloatValue]", op.Value)
+	}
+	return int(f.FloatValue), nil
 }

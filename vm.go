@@ -80,6 +80,30 @@ func (s *state) pop() (interface{}, error) {
 	return x, nil
 }
 
+func (s *state) popBool() (bool, error) {
+	x, err := s.pop()
+	if err != nil {
+		return false, err
+	}
+	b, ok := x.(bool)
+	if !ok {
+		return false, fmt.Errorf("wrong type popped from stack [%T != bool]", x)
+	}
+	return b, nil
+}
+
+func (s *state) popString() (string, error) {
+	x, err := s.pop()
+	if err != nil {
+		return "", err
+	}
+	t, ok := x.(string)
+	if !ok {
+		return "", fmt.Errorf("wrong type popped from stack [%T != string]", x)
+	}
+	return t, nil
+}
+
 // Reading N strings from the stack is common enough that I made a dedicated
 // helper method for it.
 func (s *state) popNStrings(n int) ([]string, error) {
@@ -146,6 +170,7 @@ func (vm *VirtualMachine) SetNode(name string) error {
 	if !found {
 		return fmt.Errorf("node %q not found", name)
 	}
+
 	// Reset the state and start at this node.
 	vm.stateMu.Lock()
 	vm.state = state{
@@ -179,7 +204,7 @@ func (vm *VirtualMachine) SetSelectedOption(index int) error {
 	}
 	vm.state.push(vm.state.options[index].DestinationNode)
 	vm.state.options = vm.state.options[:0]
-	vm.execState = Suspended
+	vm.execState = WaitingForContinue
 	return nil
 }
 
@@ -202,6 +227,10 @@ func (vm *VirtualMachine) Continue() error {
 	}
 	if vm.Vars == nil {
 		return ErrNilVariableStorage
+	}
+	if vm.execState == DeliveringContent {
+		vm.execState = Running
+		return nil
 	}
 	vm.execState = Running
 	for vm.execState == Running {
@@ -256,14 +285,20 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 			// Second operand gives number of values on stack to include as
 			// substitutions.
 			// NB: the bytecode only has floats, no ints.
-			ss, err := vm.state.popNStrings(int(inst.Operands[1].GetFloatValue()))
+			n, err := operandToInt(inst.Operands[1])
+			if err != nil {
+				return err
+			}
+			ss, err := vm.state.popNStrings(n)
 			if err != nil {
 				return err
 			}
 			line.Substitutions = ss
 		}
-		if vm.Handler.Line(line) == PauseExecution {
-			vm.execState = Suspended
+		vm.execState = DeliveringContent
+		vm.Handler.Line(line)
+		if vm.execState == DeliveringContent {
+			vm.execState = WaitingForContinue
 		}
 
 	case yarnpb.Instruction_RUN_COMMAND:
@@ -274,7 +309,11 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 			// Second operand gives number of values on stack to interpolate
 			// into the command as substitutions.
 			// NB: the bytecode only has floats, no ints.
-			ss, err := vm.state.popNStrings(int(inst.Operands[1].GetFloatValue()))
+			n, err := operandToInt(inst.Operands[1])
+			if err != nil {
+				return err
+			}
+			ss, err := vm.state.popNStrings(n)
 			if err != nil {
 				return err
 			}
@@ -282,8 +321,10 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 				cmd = strings.Replace(cmd, fmt.Sprintf("{%d}", i), s, -1)
 			}
 		}
-		if vm.Handler.Command(cmd) == PauseExecution {
-			vm.execState = Suspended
+		vm.execState = DeliveringContent
+		vm.Handler.Command(cmd)
+		if vm.execState == DeliveringContent {
+			vm.execState = WaitingForContinue
 		}
 
 	case yarnpb.Instruction_ADD_OPTION:
@@ -299,16 +340,30 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 			ID: inst.Operands[0].GetStringValue(),
 		}
 		if len(inst.Operands) > 2 {
-			ss, err := vm.state.popNStrings(int(inst.Operands[2].GetFloatValue()))
+			n, err := operandToInt(inst.Operands[2])
+			if err != nil {
+				return err
+			}
+			ss, err := vm.state.popNStrings(n)
 			if err != nil {
 				return err
 			}
 			line.Substitutions = ss
 		}
+		avail := true
+		if len(inst.Operands) > 3 && inst.Operands[3].GetBoolValue() {
+			// Condition must be on the stack as a bool.
+			cp, err := vm.state.popBool()
+			if err != nil {
+				return err
+			}
+			avail = cp
+		}
 		vm.state.options = append(vm.state.options, Option{
 			ID:              len(vm.state.options),
 			Line:            line,
 			DestinationNode: inst.Operands[1].GetStringValue(),
+			IsAvailable:     avail,
 		})
 
 	case yarnpb.Instruction_SHOW_OPTIONS:
@@ -318,10 +373,16 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 		// No operands.
 		if len(vm.state.options) == 0 {
 			// NOTE: jon implements this as a machine stop instead of an exception
+			vm.execState = Stopped
+			vm.Handler.DialogueComplete()
 			return ErrNoOptions
 		}
 		vm.execState = WaitingOnOptionSelection
 		vm.Handler.Options(vm.state.options)
+		if vm.execState == WaitingForContinue {
+			// The handler called SetSelectedOption!
+			vm.execState = Running
+		}
 
 	case yarnpb.Instruction_PUSH_STRING:
 		// Pushes a string onto the stack.
@@ -443,10 +504,23 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 		// opA = name of variable
 		k := inst.Operands[0].GetStringValue()
 		v, ok := vm.Vars.GetValue(k)
+		if ok {
+			vm.state.push(v)
+			return nil
+		}
+		// Is it provided as an initial value?
+		w, ok := vm.Program.InitialValues[k]
 		if !ok {
 			return fmt.Errorf("no variable called %q", k)
 		}
-		vm.state.push(v)
+		switch x := w.Value.(type) {
+		case *yarnpb.Operand_BoolValue:
+			vm.state.push(x.BoolValue)
+		case *yarnpb.Operand_FloatValue:
+			vm.state.push(x.FloatValue)
+		case *yarnpb.Operand_StringValue:
+			vm.state.push(x.StringValue)
+		}
 
 	case yarnpb.Instruction_STORE_VARIABLE:
 		// Stores the contents of the top of the stack in the named
@@ -457,11 +531,7 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 		if err != nil {
 			return err
 		}
-		x, err := convertToFloat(v)
-		if err != nil {
-			return err
-		}
-		vm.Vars.SetValue(k, x)
+		vm.Vars.SetValue(k, v)
 
 	case yarnpb.Instruction_STOP:
 		// Stops execution of the program.
@@ -474,24 +544,15 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 		// Pops a string off the top of the stack, and runs the node with
 		// that name.
 		// No operands.
-		node := ""
-		if len(inst.Operands) == 0 || inst.Operands[0].GetStringValue() == "" {
-			// Use the stack, Luke.
-			t, err := vm.state.peekString()
-			if err != nil {
-				return err
-			}
-			node = t
-		} else {
-			node = inst.Operands[0].GetStringValue()
+		node, err := vm.state.popString()
+		if err != nil {
+			return err
 		}
-		pause := vm.Handler.NodeComplete(vm.state.node.Name)
+		vm.Handler.NodeComplete(vm.state.node.Name)
 		if err := vm.SetNode(node); err != nil {
 			return err
 		}
-		if pause == PauseExecution {
-			vm.execState = Suspended
-		}
+		vm.state.pc--
 
 	default:
 		return fmt.Errorf("invalid opcode %v", inst.Opcode)
