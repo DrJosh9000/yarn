@@ -114,7 +114,9 @@ func (vm *VirtualMachine) SetNode(name string) error {
 		node: node,
 	}
 	vm.stateMu.Unlock()
-	vm.Handler.NodeStart(name)
+	if err := vm.Handler.NodeStart(name); err != nil {
+		return fmt.Errorf("handler.NodeStart: %w", err)
+	}
 
 	// Find all lines in the node and pass them to PrepareForLines.
 	var ids []string
@@ -124,7 +126,9 @@ func (vm *VirtualMachine) SetNode(name string) error {
 			ids = append(ids, inst.Operands[0].GetStringValue())
 		}
 	}
-	vm.Handler.PrepareForLines(ids)
+	if err := vm.Handler.PrepareForLines(ids); err != nil {
+		return fmt.Errorf("handler.PrepareForLines: %w", err)
+	}
 	return nil
 }
 
@@ -140,7 +144,7 @@ func (vm *VirtualMachine) SetSelectedOption(index int) error {
 		return fmt.Errorf("selected option %d out of bounds [0, %d)", index, optslen)
 	}
 	vm.state.push(vm.state.options[index].DestinationNode)
-	vm.state.options = vm.state.options[:0]
+	vm.state.options = nil
 	vm.execState = waitingForContinue
 	return nil
 }
@@ -179,9 +183,13 @@ func (vm *VirtualMachine) Continue() error {
 		}
 		vm.state.pc++
 		if proglen := len(vm.state.node.Instructions); vm.state.pc >= proglen {
-			vm.Handler.NodeComplete(vm.state.node.Name)
+			if err := vm.Handler.NodeComplete(vm.state.node.Name); err != nil {
+				return fmt.Errorf("handler.NodeComplete: %w", err)
+			}
 			vm.execState = stopped
-			vm.Handler.DialogueComplete()
+			if err := vm.Handler.DialogueComplete(); err != nil {
+				return fmt.Errorf("handler.DialogueComplete: %w", err)
+			}
 		}
 	}
 	return nil
@@ -235,7 +243,9 @@ func (vm *VirtualMachine) execute(inst *yarnpb.Instruction) error {
 			line.Substitutions = ss
 		}
 		vm.execState = deliveringContent
-		vm.Handler.Line(line)
+		if err := vm.Handler.Line(line); err != nil {
+			return fmt.Errorf("handler.Line: %w", err)
+		}
 		if vm.execState == deliveringContent {
 			vm.execState = waitingForContinue
 		}
@@ -261,7 +271,9 @@ func (vm *VirtualMachine) execute(inst *yarnpb.Instruction) error {
 			}
 		}
 		vm.execState = deliveringContent
-		vm.Handler.Command(cmd)
+		if err := vm.Handler.Command(cmd); err != nil {
+			return fmt.Errorf("handler.Command: %w", err)
+		}
 		if vm.execState == deliveringContent {
 			vm.execState = waitingForContinue
 		}
@@ -317,7 +329,9 @@ func (vm *VirtualMachine) execute(inst *yarnpb.Instruction) error {
 			return ErrNoOptions
 		}
 		vm.execState = waitingOnOptionSelection
-		vm.Handler.Options(vm.state.options)
+		if err := vm.Handler.Options(vm.state.options); err != nil {
+			return fmt.Errorf("handler.Options: %w", err)
+		}
 		if vm.execState == waitingForContinue {
 			// The handler called SetSelectedOption!
 			vm.execState = running
@@ -475,8 +489,12 @@ func (vm *VirtualMachine) execute(inst *yarnpb.Instruction) error {
 	case yarnpb.Instruction_STOP:
 		// Stops execution of the program.
 		// No operands.
-		vm.Handler.NodeComplete(vm.state.node.Name)
-		vm.Handler.DialogueComplete()
+		if err := vm.Handler.NodeComplete(vm.state.node.Name); err != nil {
+			return fmt.Errorf("handler.NodeComplete: %w", err)
+		}
+		if err := vm.Handler.DialogueComplete(); err != nil {
+			return fmt.Errorf("handler.DialogueComplete: %w", err)
+		}
 		vm.execState = stopped
 
 	case yarnpb.Instruction_RUN_NODE:
@@ -487,7 +505,9 @@ func (vm *VirtualMachine) execute(inst *yarnpb.Instruction) error {
 		if err != nil {
 			return fmt.Errorf("popString: %w", err)
 		}
-		vm.Handler.NodeComplete(vm.state.node.Name)
+		if err := vm.Handler.NodeComplete(vm.state.node.Name); err != nil {
+			return fmt.Errorf("handler.NodeComplete: %w", err)
+		}
 		if err := vm.SetNode(node); err != nil {
 			return fmt.Errorf("SetNode: %w", err)
 		}
