@@ -27,130 +27,59 @@ import (
 
 // BUG: This package hasn't been used or tested yet, and is incomplete.
 
+// Various sentinel errors.
 var (
-	ErrNoNodeSelected           = errors.New("no node selected to run")
+	// ErrNoNodeSelected indicates the VM tried to run but SetNode hadn't been
+	// called.
+	ErrNoNodeSelected = errors.New("no node selected to run")
+
+	// ErrWaitingOnOptionSelection indicates the VM delivered options to the
+	// handler, but an option hasn't been selected (with SetSelectedOption).
 	ErrWaitingOnOptionSelection = errors.New("waiting on option selection")
-	ErrNilDialogueHandler       = errors.New("nil dialogue handler")
-	ErrNilVariableStorage       = errors.New("nil variable storage")
-	ErrMissingProgram           = errors.New("missing or empty program")
-	ErrNoOptions                = errors.New("no options were added")
+
+	// ErrNilDialogueHandler indicates that Handler hasn't been set.
+	ErrNilDialogueHandler = errors.New("nil dialogue handler")
+
+	// ErrNilVariableStorage indicates that Vars hasn't been set.
+	ErrNilVariableStorage = errors.New("nil variable storage")
+
+	// ErrMissingProgram indicates that Program hasn't been set.
+	ErrMissingProgram = errors.New("missing or empty program")
+
+	// ErrNoOptions indicates the program is invalid - it tried to show options
+	// but none had been added.
+	ErrNoOptions = errors.New("no options were added")
 )
 
+// Used to check the second return arg of functions in FuncMap.
 var errorType = reflect.TypeOf((*error)(nil)).Elem()
 
-// ExecState is the highest-level machine state.
-type ExecState int
+// execState is the highest-level machine state.
+type execState int
 
 const (
 	// The Virtual Machine is not running a node.
-	Stopped = ExecState(iota)
+	stopped = execState(iota)
 
 	// The Virtual Machine is waiting on option selection.
-	WaitingOnOptionSelection
+	waitingOnOptionSelection
 
 	//The VirtualMachine has finished delivering content to the
 	// client game, and is waiting for Continue to be called.
-	WaitingForContinue
+	waitingForContinue
 
 	// The VirtualMachine is delivering a line, options, or a
 	// commmand to the client game.
-	DeliveringContent
+	deliveringContent
 
 	// The VirtualMachine is in the middle of executing code.
-	Running
+	running
 )
-
-type state struct {
-	node    *yarnpb.Node // current node
-	pc      int          // program counter
-	stack   []interface{}
-	options []Option
-}
-
-// push pushes a value onto the state's stack.
-func (s *state) push(x interface{}) { s.stack = append(s.stack, x) }
-
-// pop removes a value from the stack and returns it.
-func (s *state) pop() (interface{}, error) {
-	x, err := s.peek()
-	if err != nil {
-		return nil, err
-	}
-	s.stack = s.stack[:len(s.stack)-1]
-	return x, nil
-}
-
-func (s *state) popBool() (bool, error) {
-	x, err := s.pop()
-	if err != nil {
-		return false, err
-	}
-	b, ok := x.(bool)
-	if !ok {
-		return false, fmt.Errorf("wrong type popped from stack [%T != bool]", x)
-	}
-	return b, nil
-}
-
-func (s *state) popString() (string, error) {
-	x, err := s.pop()
-	if err != nil {
-		return "", err
-	}
-	t, ok := x.(string)
-	if !ok {
-		return "", fmt.Errorf("wrong type popped from stack [%T != string]", x)
-	}
-	return t, nil
-}
-
-// Reading N strings from the stack is common enough that I made a dedicated
-// helper method for it.
-func (s *state) popNStrings(n int) ([]string, error) {
-	if n < 1 {
-		return nil, fmt.Errorf("too few items requested [%d < 1]", n)
-	}
-	if n > len(s.stack) {
-		return nil, fmt.Errorf("stack underflow [%d > %d]", n, len(s.stack))
-	}
-	rem := len(s.stack) - n
-	ss := make([]string, n)
-	for i, x := range s.stack[rem:] {
-		t, ok := x.(string)
-		if !ok {
-			return nil, fmt.Errorf("wrong type from stack [%T != string]", x)
-		}
-		ss[i] = t
-	}
-	s.stack = s.stack[:rem]
-	return ss, nil
-}
-
-// peek returns the top vaue from the stack only.
-func (s *state) peek() (interface{}, error) {
-	if len(s.stack) == 0 {
-		return nil, errors.New("stack underflow")
-	}
-	return s.stack[len(s.stack)-1], nil
-}
-
-// Peek returns the string form the top of the stack.
-func (s *state) peekString() (string, error) {
-	x, err := s.peek()
-	if err != nil {
-		return "", err
-	}
-	t, ok := x.(string)
-	if !ok {
-		return "", fmt.Errorf("wrong type at top of stack [%T != string]", x)
-	}
-	return t, nil
-}
 
 // VirtualMachine implements the Yarn Spinner virtual machine.
 type VirtualMachine struct {
 	stateMu   sync.RWMutex
-	execState ExecState
+	execState execState
 	state     state
 
 	// Program to execute
@@ -196,7 +125,7 @@ func (vm *VirtualMachine) SetNode(name string) error {
 func (vm *VirtualMachine) SetSelectedOption(index int) error {
 	vm.stateMu.Lock()
 	defer vm.stateMu.Unlock()
-	if vm.execState != WaitingOnOptionSelection {
+	if vm.execState != waitingOnOptionSelection {
 		return fmt.Errorf("not waiting for an option selection [m.execState = %d]", vm.execState)
 	}
 	if optslen := len(vm.state.options); index < 0 || index >= optslen {
@@ -204,22 +133,23 @@ func (vm *VirtualMachine) SetSelectedOption(index int) error {
 	}
 	vm.state.push(vm.state.options[index].DestinationNode)
 	vm.state.options = vm.state.options[:0]
-	vm.execState = WaitingForContinue
+	vm.execState = waitingForContinue
 	return nil
 }
 
 // Stop stops the virtual machine.
 func (vm *VirtualMachine) Stop() {
 	vm.stateMu.Lock()
-	vm.execState = Stopped
+	vm.execState = stopped
 	vm.stateMu.Unlock()
 }
 
+// Continue continues executing the VM.
 func (vm *VirtualMachine) Continue() error {
 	if vm.state.node == nil {
 		return ErrNoNodeSelected
 	}
-	if vm.execState == WaitingOnOptionSelection {
+	if vm.execState == waitingOnOptionSelection {
 		return ErrWaitingOnOptionSelection
 	}
 	if vm.Handler == nil {
@@ -228,27 +158,26 @@ func (vm *VirtualMachine) Continue() error {
 	if vm.Vars == nil {
 		return ErrNilVariableStorage
 	}
-	if vm.execState == DeliveringContent {
-		vm.execState = Running
+	if vm.execState == deliveringContent {
+		vm.execState = running
 		return nil
 	}
-	vm.execState = Running
-	for vm.execState == Running {
-		if err := vm.Execute(vm.state.node.Instructions[vm.state.pc]); err != nil {
+	vm.execState = running
+	for vm.execState == running {
+		if err := vm.execute(vm.state.node.Instructions[vm.state.pc]); err != nil {
 			return err
 		}
 		vm.state.pc++
 		if proglen := len(vm.state.node.Instructions); vm.state.pc >= proglen {
 			vm.Handler.NodeComplete(vm.state.node.Name)
-			vm.execState = Stopped
+			vm.execState = stopped
 			vm.Handler.DialogueComplete()
 		}
 	}
 	return nil
 }
 
-// Execute executes a single instruction.
-func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
+func (vm *VirtualMachine) execute(inst *yarnpb.Instruction) error {
 	switch inst.Opcode {
 
 	case yarnpb.Instruction_JUMP_TO:
@@ -295,10 +224,10 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 			}
 			line.Substitutions = ss
 		}
-		vm.execState = DeliveringContent
+		vm.execState = deliveringContent
 		vm.Handler.Line(line)
-		if vm.execState == DeliveringContent {
-			vm.execState = WaitingForContinue
+		if vm.execState == deliveringContent {
+			vm.execState = waitingForContinue
 		}
 
 	case yarnpb.Instruction_RUN_COMMAND:
@@ -321,10 +250,10 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 				cmd = strings.Replace(cmd, fmt.Sprintf("{%d}", i), s, -1)
 			}
 		}
-		vm.execState = DeliveringContent
+		vm.execState = deliveringContent
 		vm.Handler.Command(cmd)
-		if vm.execState == DeliveringContent {
-			vm.execState = WaitingForContinue
+		if vm.execState == deliveringContent {
+			vm.execState = waitingForContinue
 		}
 
 	case yarnpb.Instruction_ADD_OPTION:
@@ -373,15 +302,15 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 		// No operands.
 		if len(vm.state.options) == 0 {
 			// NOTE: jon implements this as a machine stop instead of an exception
-			vm.execState = Stopped
+			vm.execState = stopped
 			vm.Handler.DialogueComplete()
 			return ErrNoOptions
 		}
-		vm.execState = WaitingOnOptionSelection
+		vm.execState = waitingOnOptionSelection
 		vm.Handler.Options(vm.state.options)
-		if vm.execState == WaitingForContinue {
+		if vm.execState == waitingForContinue {
 			// The handler called SetSelectedOption!
-			vm.execState = Running
+			vm.execState = running
 		}
 
 	case yarnpb.Instruction_PUSH_STRING:
@@ -538,7 +467,7 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 		// No operands.
 		vm.Handler.NodeComplete(vm.state.node.Name)
 		vm.Handler.DialogueComplete()
-		vm.execState = Stopped
+		vm.execState = stopped
 
 	case yarnpb.Instruction_RUN_NODE:
 		// Pops a string off the top of the stack, and runs the node with
@@ -558,4 +487,91 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 		return fmt.Errorf("invalid opcode %v", inst.Opcode)
 	}
 	return nil
+}
+
+type state struct {
+	node    *yarnpb.Node // current node
+	pc      int          // program counter
+	stack   []interface{}
+	options []Option
+}
+
+// push pushes a value onto the state's stack.
+func (s *state) push(x interface{}) { s.stack = append(s.stack, x) }
+
+// pop removes a value from the stack and returns it.
+func (s *state) pop() (interface{}, error) {
+	x, err := s.peek()
+	if err != nil {
+		return nil, err
+	}
+	s.stack = s.stack[:len(s.stack)-1]
+	return x, nil
+}
+
+func (s *state) popBool() (bool, error) {
+	x, err := s.pop()
+	if err != nil {
+		return false, err
+	}
+	b, ok := x.(bool)
+	if !ok {
+		return false, fmt.Errorf("wrong type popped from stack [%T != bool]", x)
+	}
+	return b, nil
+}
+
+func (s *state) popString() (string, error) {
+	x, err := s.pop()
+	if err != nil {
+		return "", err
+	}
+	t, ok := x.(string)
+	if !ok {
+		return "", fmt.Errorf("wrong type popped from stack [%T != string]", x)
+	}
+	return t, nil
+}
+
+// Reading N strings from the stack is common enough that I made a dedicated
+// helper method for it.
+func (s *state) popNStrings(n int) ([]string, error) {
+	if n < 1 {
+		return nil, fmt.Errorf("too few items requested [%d < 1]", n)
+	}
+	if n > len(s.stack) {
+		return nil, fmt.Errorf("stack underflow [%d > %d]", n, len(s.stack))
+	}
+	rem := len(s.stack) - n
+	ss := make([]string, n)
+	for i, x := range s.stack[rem:] {
+		t, ok := x.(string)
+		if !ok {
+			return nil, fmt.Errorf("wrong type from stack [%T != string]", x)
+		}
+		ss[i] = t
+	}
+	s.stack = s.stack[:rem]
+	return ss, nil
+}
+
+// peek returns the top vaue from the stack only.
+func (s *state) peek() (interface{}, error) {
+	if len(s.stack) == 0 {
+		return nil, errors.New("stack underflow")
+	}
+	return s.stack[len(s.stack)-1], nil
+}
+
+// Peek returns the string form the top of the stack.
+func (s *state) peekString() (string, error) {
+	x, err := s.peek()
+	if err != nil {
+		return "", err
+	}
+	t, ok := x.(string)
+	if !ok {
+		return "", fmt.Errorf("wrong type at top of stack [%T != string]", x)
+	}
+	return t, nil
 }

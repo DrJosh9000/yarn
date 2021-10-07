@@ -31,13 +31,13 @@ func (m MapVariableStorage) Clear() {
 	}
 }
 
-// Get fetches a value from the map.
+// GetValue fetches a value from the map, returning (nil, false) if not present.
 func (m MapVariableStorage) GetValue(name string) (value interface{}, found bool) {
 	value, found = m[name]
 	return value, found
 }
 
-// Set sets a value in the map.
+// SetValue sets a value in the map.
 func (m MapVariableStorage) SetValue(name string, value interface{}) {
 	m[name] = value
 }
