@@ -36,27 +36,6 @@ type Option struct {
 	DestinationNode string
 }
 
-// MapVariableStorage implements VariableStorage, in memory, using a map.
-type MapVariableStorage map[string]interface{}
-
-// Clear empties the storage of all values.
-func (m MapVariableStorage) Clear() {
-	for name := range m {
-		delete(m, name)
-	}
-}
-
-// Get fetches a value from the map.
-func (m MapVariableStorage) GetValue(name string) (value interface{}, found bool) {
-	value, found = m[name]
-	return value, found
-}
-
-// Set sets a value in the map.
-func (m MapVariableStorage) SetValue(name string, value interface{}) {
-	m[name] = value
-}
-
 // HandlerExecutionType values control what the dialogue system does when
 // control is passed to a handler.
 type HandlerExecutionType int
@@ -69,25 +48,6 @@ const (
 	ContinueExecution
 )
 
-// Function represents a generic callable function from the VM.
-type Function interface {
-	Invoke(params ...interface{}) (interface{}, error)
-	ParamCount() int
-	Returns() bool
-}
-
-// Library provides a collection of functions callable from the VM.
-type Library interface {
-	Function(name string) (Function, error)
-}
-
-// VariableStorage stores numeric variables.
-type VariableStorage interface {
-	Clear()
-	GetValue(name string) (value interface{}, ok bool)
-	SetValue(name string, value interface{})
-}
-
 // DialogueHandler receives events from the VM.
 type DialogueHandler interface {
 	// Line is called when the dialogue system runs a line of dialogue.
@@ -99,16 +59,21 @@ type DialogueHandler interface {
 	Options([]Option)
 
 	// Command is called when the dialogue system runs a command.
-	Command(string) HandlerExecutionType
+	Command(command string) HandlerExecutionType
 
 	// NodeStart is called when a node has begun executing. It is passed the
 	// name of the node.
-	NodeStart(string) HandlerExecutionType
+	NodeStart(nodeName string) HandlerExecutionType
 
 	// NodeComplete is called when a node has completed execution. It is passed
 	// the name of the node.
-	NodeComplete(string) HandlerExecutionType
+	NodeComplete(nodeName string) HandlerExecutionType
 
 	// DialogueComplete is called when the dialogue as a whole is complete.
 	DialogueComplete()
+
+	// PrepareForLines is called when the dialogue system anticipates that it
+	// will deliver some lines. Note that not every line prepared may end up
+	// being run.
+	PrepareForLines(lineIDs []string)
 }

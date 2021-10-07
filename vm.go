@@ -42,9 +42,21 @@ var errorType = reflect.TypeOf((*error)(nil)).Elem()
 type ExecState int
 
 const (
+	// The Virtual Machine is not running a node.
 	Stopped = ExecState(iota)
+
+	// The Virtual Machine is waiting on option selection.
 	WaitingOnOptionSelection
-	Suspended
+
+	//The VirtualMachine has finished delivering content to the
+	// client game, and is waiting for Continue to be called.
+	WaitingForContinue
+
+	// The VirtualMachine is delivering a line, options, or a
+	// commmand to the client game.
+	DeliveringContent
+
+	// The VirtualMachine is in the middle of executing code.
 	Running
 )
 
@@ -111,7 +123,7 @@ func (s *state) peekString() (string, error) {
 	return t, nil
 }
 
-// VirtualMachine implements the virtual machine.
+// VirtualMachine implements the Yarn Spinner virtual machine.
 type VirtualMachine struct {
 	stateMu   sync.RWMutex
 	execState ExecState
@@ -141,6 +153,16 @@ func (vm *VirtualMachine) SetNode(name string) error {
 	}
 	vm.stateMu.Unlock()
 	vm.Handler.NodeStart(name)
+
+	// Find all lines in the node and pass them to PrepareForLines.
+	var ids []string
+	for _, inst := range node.Instructions {
+		switch inst.Opcode {
+		case yarnpb.Instruction_RUN_LINE, yarnpb.Instruction_ADD_OPTION:
+			ids = append(ids, inst.Operands[0].GetStringValue())
+		}
+	}
+	vm.Handler.PrepareForLines(ids)
 	return nil
 }
 
@@ -201,6 +223,8 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 	switch inst.Opcode {
 
 	case yarnpb.Instruction_JUMP_TO:
+		// Jumps to a named position in the node.
+		// opA = string: label name
 		k := inst.Operands[0].GetStringValue()
 		pc, ok := vm.state.node.Labels[k]
 		if !ok {
@@ -209,6 +233,9 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 		vm.state.pc = int(pc) - 1
 
 	case yarnpb.Instruction_JUMP:
+		// Peeks a string from stack, and jumps to that named position in
+		// the node.
+		// No operands.
 		k, err := vm.state.peekString()
 		if err != nil {
 			return err
@@ -220,6 +247,8 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 		vm.state.pc = int(pc) - 1
 
 	case yarnpb.Instruction_RUN_LINE:
+		// Delivers a string ID to the client.
+		// opA = string: string ID
 		line := Line{
 			ID: inst.Operands[0].GetStringValue(),
 		}
@@ -238,6 +267,8 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 		}
 
 	case yarnpb.Instruction_RUN_COMMAND:
+		// Delivers a command to the client.
+		// opA = string: command text
 		cmd := inst.Operands[0].GetStringValue()
 		if len(inst.Operands) > 1 {
 			// Second operand gives number of values on stack to interpolate
@@ -256,6 +287,14 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 		}
 
 	case yarnpb.Instruction_ADD_OPTION:
+		// Adds an entry to the option list (see ShowOptions).
+		// - opA = string: string ID for option to add
+		// - opB = string: destination to go to if this option is selected
+		// - opC = number: number of expressions on the stack to insert
+		//   into the line
+		// - opD = bool: whether the option has a condition on it (in which
+		//   case a value should be popped off the stack and used to signal
+		//   the game that the option should be not available)
 		line := Line{
 			ID: inst.Operands[0].GetStringValue(),
 		}
@@ -273,6 +312,10 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 		})
 
 	case yarnpb.Instruction_SHOW_OPTIONS:
+		// Presents the current list of options to the client, then clears
+		// the list. The most recently selected option will be on the top
+		// of the stack when execution resumes.
+		// No operands.
 		if len(vm.state.options) == 0 {
 			// NOTE: jon implements this as a machine stop instead of an exception
 			return ErrNoOptions
@@ -281,18 +324,29 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 		vm.Handler.Options(vm.state.options)
 
 	case yarnpb.Instruction_PUSH_STRING:
+		// Pushes a string onto the stack.
+		// opA = string: the string to push to the stack.
 		vm.state.push(inst.Operands[0].GetStringValue())
 
 	case yarnpb.Instruction_PUSH_FLOAT:
+		// Pushes a floating point number onto the stack.
+		// opA = float: number to push to stack
 		vm.state.push(inst.Operands[0].GetFloatValue())
 
 	case yarnpb.Instruction_PUSH_BOOL:
+		// Pushes a boolean onto the stack.
+		// opA = bool: the bool to push to stack
 		vm.state.push(inst.Operands[0].GetBoolValue())
 
 	case yarnpb.Instruction_PUSH_NULL:
+		// Pushes a null value onto the stack.
+		// No operands.
 		vm.state.push(nil)
 
 	case yarnpb.Instruction_JUMP_IF_FALSE:
+		// Jumps to the named position in the the node, if the top of the
+		// stack is not null, zero or false.
+		// opA = string: label name
 		x, err := vm.state.peek()
 		if err != nil {
 			return err
@@ -313,11 +367,18 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 		vm.state.pc = int(pc) - 1
 
 	case yarnpb.Instruction_POP:
+		// Discards top of stack.
+		// No operands.
 		if _, err := vm.state.pop(); err != nil {
 			return err
 		}
 
 	case yarnpb.Instruction_CALL_FUNC:
+		// Calls a function in the client. Pops as many arguments as the
+		// client indicates the function receives, and the result (if any)
+		// is pushed to the stack.
+		// opA = string: name of the function
+
 		// TODO: typecheck FuncMap during preprocessing
 		// TODO: a lot of this is very forgiving...
 		k := inst.Operands[0].GetStringValue()
@@ -378,6 +439,8 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 		}
 
 	case yarnpb.Instruction_PUSH_VARIABLE:
+		// Pushes the contents of a variable onto the stack.
+		// opA = name of variable
 		k := inst.Operands[0].GetStringValue()
 		v, ok := vm.Vars.GetValue(k)
 		if !ok {
@@ -386,6 +449,9 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 		vm.state.push(v)
 
 	case yarnpb.Instruction_STORE_VARIABLE:
+		// Stores the contents of the top of the stack in the named
+		// variable.
+		// opA = name of variable
 		k := inst.Operands[0].GetStringValue()
 		v, err := vm.state.peek()
 		if err != nil {
@@ -398,11 +464,16 @@ func (vm *VirtualMachine) Execute(inst *yarnpb.Instruction) error {
 		vm.Vars.SetValue(k, x)
 
 	case yarnpb.Instruction_STOP:
+		// Stops execution of the program.
+		// No operands.
 		vm.Handler.NodeComplete(vm.state.node.Name)
 		vm.Handler.DialogueComplete()
 		vm.execState = Stopped
 
 	case yarnpb.Instruction_RUN_NODE:
+		// Pops a string off the top of the stack, and runs the node with
+		// that name.
+		// No operands.
 		node := ""
 		if len(inst.Operands) == 0 || inst.Operands[0].GetStringValue() == "" {
 			// Use the stack, Luke.
