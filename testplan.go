@@ -37,7 +37,7 @@ type TestPlan struct {
 	VirtualMachine *VirtualMachine
 }
 
-// ReadTestPlane reads a testplan file into a TestPlan.
+// ReadTestPlan reads a testplan file into a TestPlan.
 func ReadTestPlan(r io.Reader) (*TestPlan, error) {
 	var tp TestPlan
 	sc := bufio.NewScanner(r)
@@ -69,6 +69,7 @@ func (p *TestPlan) Complete() error {
 	return nil
 }
 
+// Line checks that the line matches the one expected by the plan.
 func (p *TestPlan) Line(line Line) error {
 	step := p.Steps[p.Step]
 	if step.Type != "line" {
@@ -85,6 +86,8 @@ func (p *TestPlan) Line(line Line) error {
 	return nil
 }
 
+// Options checks that the options match those expected by the plan, then
+// selects the option specified in the plan.
 func (p *TestPlan) Options(opts []Option) error {
 	for _, opt := range opts {
 		step := p.Steps[p.Step]
@@ -113,6 +116,7 @@ func (p *TestPlan) Options(opts []Option) error {
 	return p.VirtualMachine.SetSelectedOption(n - 1)
 }
 
+// Command handles the command... somehow.
 func (p *TestPlan) Command(command string) error {
 	// TODO: how are commands handled in real yarnspinner's testplan?
 	if strings.HasPrefix(command, "jump ") {
@@ -129,18 +133,14 @@ func (p *TestPlan) Command(command string) error {
 	return nil
 }
 
-func (p *TestPlan) NodeStart(nodeName string) error {
-	return nil
-}
+// NodeStart does nothing.
+func (p *TestPlan) NodeStart(string) error { return nil }
 
-func (p *TestPlan) NodeComplete(nodeName string) error {
-	return nil
-}
+// NodeComplete does nothing.
+func (p *TestPlan) NodeComplete(string) error { return nil }
 
-func (p *TestPlan) DialogueComplete() error {
-	return nil
-}
+// DialogueComplete does nothing.
+func (p *TestPlan) DialogueComplete() error { return nil }
 
-func (p *TestPlan) PrepareForLines(lineIDs []string) error {
-	return nil
-}
+// PrepareForLines does nothing.
+func (p *TestPlan) PrepareForLines([]string) error { return nil }

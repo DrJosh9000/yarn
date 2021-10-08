@@ -456,7 +456,7 @@ func (vm *VirtualMachine) execCallFunc(operands []*yarnpb.Operand) error {
 	case ft.IsVariadic() && got < want-1:
 		// The last (variadic) arg is free to be empty.
 		return fmt.Errorf("insufficient args [%d < %d]", got, want)
-	case got != want:
+	case !ft.IsVariadic() && got != want:
 		return fmt.Errorf("wrong number of args [%d != %d]", got, want)
 	}
 
@@ -482,7 +482,7 @@ func (vm *VirtualMachine) execCallFunc(operands []*yarnpb.Operand) error {
 		params[got] = reflect.ValueOf(p)
 	}
 
-	// Just because the command could affect PC, increment first
+	// Because the func could overwrite PC, increment first
 	vm.state.pc++
 
 	result := reflect.ValueOf(f).Call(params)
