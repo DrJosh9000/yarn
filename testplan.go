@@ -32,7 +32,9 @@ type TestStep struct {
 type TestPlan struct {
 	Steps []TestStep
 	Step  int
-	VM    *VirtualMachine
+
+	StringTable    StringTable
+	VirtualMachine *VirtualMachine
 }
 
 // ReadTestPlane reads a testplan file into a TestPlan.
@@ -40,13 +42,17 @@ func ReadTestPlan(r io.Reader) (*TestPlan, error) {
 	var tp TestPlan
 	sc := bufio.NewScanner(r)
 	for sc.Scan() {
-		tok := strings.SplitN(sc.Text(), ": ", 2)
+		txt := sc.Text()
+		if strings.HasPrefix(txt, "#") {
+			continue
+		}
+		tok := strings.SplitN(txt, ":", 2)
 		if len(tok) < 2 {
-			return nil, fmt.Errorf("malformed testplan step %q", sc.Text())
+			return nil, fmt.Errorf("malformed testplan step %q", txt)
 		}
 		tp.Steps = append(tp.Steps, TestStep{
-			Type:     tok[0],
-			Contents: tok[1],
+			Type:     strings.TrimSpace(tok[0]),
+			Contents: strings.TrimSpace(tok[1]),
 		})
 	}
 	if err := sc.Err(); err != nil {
@@ -69,18 +75,30 @@ func (p *TestPlan) Line(line Line) error {
 		return fmt.Errorf("testplan got line, want %q", step.Type)
 	}
 	p.Step++
-	// TODO: check the line
+	row, found := p.StringTable[line.ID]
+	if !found {
+		return fmt.Errorf("no string %q in string table", line.ID)
+	}
+	if row.Text != step.Contents {
+		return fmt.Errorf("testplan got line %q, want %q", row.Text, step.Contents)
+	}
 	return nil
 }
 
 func (p *TestPlan) Options(opts []Option) error {
-	for range opts {
+	for _, opt := range opts {
 		step := p.Steps[p.Step]
 		if step.Type != "option" {
 			return fmt.Errorf("testplan got option, want %q", step.Type)
 		}
 		p.Step++
-		// TODO: check the option
+		row, found := p.StringTable[opt.Line.ID]
+		if !found {
+			return fmt.Errorf("no string %q in string table", opt.Line.ID)
+		}
+		if row.Text != step.Contents {
+			return fmt.Errorf("testplan got line %q, want %q", row.Text, step.Contents)
+		}
 	}
 	// Next step should be a select
 	step := p.Steps[p.Step]
@@ -92,14 +110,14 @@ func (p *TestPlan) Options(opts []Option) error {
 	if err != nil {
 		return fmt.Errorf("converting testplan step to int: %w", err)
 	}
-	return p.VM.SetSelectedOption(n - 1)
+	return p.VirtualMachine.SetSelectedOption(n - 1)
 }
 
 func (p *TestPlan) Command(command string) error {
 	// TODO: how are commands handled in real yarnspinner's testplan?
 	if strings.HasPrefix(command, "jump ") {
 		// This is basically RUN_NODE...
-		return p.VM.SetNode(strings.TrimPrefix(command, "jump "))
+		return p.VirtualMachine.SetNode(strings.TrimPrefix(command, "jump "))
 	}
 
 	step := p.Steps[p.Step]

@@ -43,19 +43,24 @@ type Option struct {
 
 // DialogueHandler receives events from the VM.
 type DialogueHandler interface {
-	// Line is called when the dialogue system runs a line of dialogue.
-	Line(Line) error
-
-	// Options is called to deliver a set of options to the game. The player
-	// should choose one of the options.
-	Options([]Option) error
-
-	// Command is called when the dialogue system runs a command.
-	Command(command string) error
-
 	// NodeStart is called when a node has begun executing. It is passed the
 	// name of the node.
 	NodeStart(nodeName string) error
+
+	// PrepareForLines is called when the dialogue system anticipates that it
+	// will deliver some lines. Note that not every line prepared may end up
+	// being run.
+	PrepareForLines(lineIDs []string) error
+
+	// Line is called when the dialogue system runs a line of dialogue.
+	Line(line Line) error
+
+	// Options is called to deliver a set of options to the game. The player
+	// should choose one of the options.
+	Options(options []Option) error
+
+	// Command is called when the dialogue system runs a command.
+	Command(command string) error
 
 	// NodeComplete is called when a node has completed execution. It is passed
 	// the name of the node.
@@ -63,9 +68,4 @@ type DialogueHandler interface {
 
 	// DialogueComplete is called when the dialogue as a whole is complete.
 	DialogueComplete() error
-
-	// PrepareForLines is called when the dialogue system anticipates that it
-	// will deliver some lines. Note that not every line prepared may end up
-	// being run.
-	PrepareForLines(lineIDs []string) error
 }

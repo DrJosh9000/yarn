@@ -29,7 +29,7 @@ const traceOutput = false
 func TestVMExample(t *testing.T) {
 	tpf, err := os.Open("testdata/Example.testplan")
 	if err != nil {
-		t.Fatalf("ReadFile: %v", err)
+		t.Fatalf("Open: %v", err)
 	}
 	defer tpf.Close()
 	testplan, err := ReadTestPlan(tpf)
@@ -46,6 +46,16 @@ func TestVMExample(t *testing.T) {
 		t.Fatalf("proto.Unmarshal: %v", err)
 	}
 
+	csv, err := os.Open("testdata/Example.yarn.csv")
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer csv.Close()
+	st, err := ReadStringTable(csv)
+	if err != nil {
+		t.Fatalf("ReadStringTable: %v", err)
+	}
+
 	if traceOutput {
 		log.Print(FormatProgram(&prog))
 	}
@@ -56,7 +66,8 @@ func TestVMExample(t *testing.T) {
 		Vars:     make(MapVariableStorage),
 		TraceLog: traceOutput,
 	}
-	testplan.VM = vm
+	testplan.StringTable = st
+	testplan.VirtualMachine = vm
 
 	if err := vm.SetNode("Start"); err != nil {
 		t.Errorf("vm.SetNode(Start) = %v", err)
