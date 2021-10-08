@@ -184,7 +184,7 @@ func (vm *VirtualMachine) Continue() error {
 		pc := vm.state.pc
 		inst := vm.state.node.Instructions[pc]
 		if vm.TraceLog {
-			log.Printf("node %q pc %d %s %v", vm.state.node.Name, pc, inst.Opcode, inst.Operands)
+			log.Printf("% 15s %06d %s", vm.state.node.Name, pc, FormatInstruction(inst))
 			log.Printf("stack %q", vm.state.stack)
 			log.Printf("options %v", vm.state.options)
 		}
@@ -205,328 +205,384 @@ func (vm *VirtualMachine) Continue() error {
 	return nil
 }
 
-func (vm *VirtualMachine) execute(inst *yarnpb.Instruction) error {
-	switch inst.Opcode {
+func (vm *VirtualMachine) execJumpTo(operands []*yarnpb.Operand) error {
+	// Jumps to a named position in the node.
+	// opA = string: label name
+	k := operands[0].GetStringValue()
+	pc, ok := vm.state.node.Labels[k]
+	if !ok {
+		return fmt.Errorf("unknown label %q in node %q", k, vm.state.node.Name)
+	}
+	vm.state.pc = int(pc) - 1
+	return nil
+}
 
-	case yarnpb.Instruction_JUMP_TO:
-		// Jumps to a named position in the node.
-		// opA = string: label name
-		k := inst.Operands[0].GetStringValue()
-		pc, ok := vm.state.node.Labels[k]
-		if !ok {
-			return fmt.Errorf("unknown label %q in node %q", k, vm.state.node.Name)
+func (vm *VirtualMachine) execJump([]*yarnpb.Operand) error {
+	// Peeks a string from stack, and jumps to that named position in
+	// the node.
+	// No operands.
+	k, err := vm.state.peekString()
+	if err != nil {
+		return err
+	}
+	pc, ok := vm.state.node.Labels[k]
+	if !ok {
+		return fmt.Errorf("unknown label %q in node %q", k, vm.state.node.Name)
+	}
+	vm.state.pc = int(pc) - 1
+	return nil
+}
+
+func (vm *VirtualMachine) execRunLine(operands []*yarnpb.Operand) error {
+	// Delivers a string ID to the client.
+	// opA = string: string ID
+	line := Line{
+		ID: operands[0].GetStringValue(),
+	}
+	if len(operands) > 1 {
+		// Second operand gives number of values on stack to include as
+		// substitutions.
+		// NB: the bytecode only has floats, no ints.
+		n, err := operandToInt(operands[1])
+		if err != nil {
+			return fmt.Errorf("operandToInt(opB): %w", err)
 		}
-		vm.state.pc = int(pc) - 1
+		ss, err := vm.state.popNStrings(n)
+		if err != nil {
+			return fmt.Errorf("popNStrings(%d): %w", n, err)
+		}
+		line.Substitutions = ss
+	}
+	vm.execState = deliveringContent
+	if err := vm.Handler.Line(line); err != nil {
+		return fmt.Errorf("handler.Line: %w", err)
+	}
+	if vm.execState == deliveringContent {
+		vm.execState = waitingForContinue
+	}
+	return nil
+}
 
-	case yarnpb.Instruction_JUMP:
-		// Peeks a string from stack, and jumps to that named position in
-		// the node.
-		// No operands.
-		k, err := vm.state.peekString()
+func (vm *VirtualMachine) execRunCommand(operands []*yarnpb.Operand) error {
+	// Delivers a command to the client.
+	// opA = string: command text
+	cmd := operands[0].GetStringValue()
+	if len(operands) > 1 {
+		// Second operand gives number of values on stack to interpolate
+		// into the command as substitutions.
+		// NB: the bytecode only has floats, no ints.
+		n, err := operandToInt(operands[1])
+		if err != nil {
+			return fmt.Errorf("operandToInt(opB): %w", err)
+		}
+		ss, err := vm.state.popNStrings(n)
+		if err != nil {
+			return fmt.Errorf("popNStrings(%d): %w", n, err)
+		}
+		for i, s := range ss {
+			cmd = strings.Replace(cmd, fmt.Sprintf("{%d}", i), s, -1)
+		}
+	}
+	vm.execState = deliveringContent
+	if err := vm.Handler.Command(cmd); err != nil {
+		return fmt.Errorf("handler.Command: %w", err)
+	}
+	if vm.execState == deliveringContent {
+		vm.execState = waitingForContinue
+	}
+	return nil
+}
+
+func (vm *VirtualMachine) execAddOption(operands []*yarnpb.Operand) error {
+	// Adds an entry to the option list (see ShowOptions).
+	// - opA = string: string ID for option to add
+	// - opB = string: destination to go to if this option is selected
+	// - opC = number: number of expressions on the stack to insert
+	//   into the line
+	// - opD = bool: whether the option has a condition on it (in which
+	//   case a value should be popped off the stack and used to signal
+	//   the game that the option should be not available)
+	line := Line{
+		ID: operands[0].GetStringValue(),
+	}
+	if len(operands) > 2 {
+		n, err := operandToInt(operands[2])
+		if err != nil {
+			return fmt.Errorf("operandToInt(opC): %w", err)
+		}
+		ss, err := vm.state.popNStrings(n)
+		if err != nil {
+			return fmt.Errorf("popNStrings(%d): %w", n, err)
+		}
+		line.Substitutions = ss
+	}
+	avail := true
+	if len(operands) > 3 && operands[3].GetBoolValue() {
+		// Condition must be on the stack as a bool.
+		cp, err := vm.state.popBool()
 		if err != nil {
 			return err
 		}
-		pc, ok := vm.state.node.Labels[k]
-		if !ok {
-			return fmt.Errorf("unknown label %q in node %q", k, vm.state.node.Name)
-		}
-		vm.state.pc = int(pc) - 1
+		avail = cp
+	}
+	vm.state.options = append(vm.state.options, Option{
+		ID:              len(vm.state.options),
+		Line:            line,
+		DestinationNode: operands[1].GetStringValue(),
+		IsAvailable:     avail,
+	})
+	return nil
+}
 
-	case yarnpb.Instruction_RUN_LINE:
-		// Delivers a string ID to the client.
-		// opA = string: string ID
-		line := Line{
-			ID: inst.Operands[0].GetStringValue(),
-		}
-		if len(inst.Operands) > 1 {
-			// Second operand gives number of values on stack to include as
-			// substitutions.
-			// NB: the bytecode only has floats, no ints.
-			n, err := operandToInt(inst.Operands[1])
-			if err != nil {
-				return fmt.Errorf("operandToInt(opB): %w", err)
-			}
-			ss, err := vm.state.popNStrings(n)
-			if err != nil {
-				return fmt.Errorf("popNStrings(%d): %w", n, err)
-			}
-			line.Substitutions = ss
-		}
-		vm.execState = deliveringContent
-		if err := vm.Handler.Line(line); err != nil {
-			return fmt.Errorf("handler.Line: %w", err)
-		}
-		if vm.execState == deliveringContent {
-			vm.execState = waitingForContinue
-		}
-
-	case yarnpb.Instruction_RUN_COMMAND:
-		// Delivers a command to the client.
-		// opA = string: command text
-		cmd := inst.Operands[0].GetStringValue()
-		if len(inst.Operands) > 1 {
-			// Second operand gives number of values on stack to interpolate
-			// into the command as substitutions.
-			// NB: the bytecode only has floats, no ints.
-			n, err := operandToInt(inst.Operands[1])
-			if err != nil {
-				return fmt.Errorf("operandToInt(opB): %w", err)
-			}
-			ss, err := vm.state.popNStrings(n)
-			if err != nil {
-				return fmt.Errorf("popNStrings(%d): %w", n, err)
-			}
-			for i, s := range ss {
-				cmd = strings.Replace(cmd, fmt.Sprintf("{%d}", i), s, -1)
-			}
-		}
-		vm.execState = deliveringContent
-		if err := vm.Handler.Command(cmd); err != nil {
-			return fmt.Errorf("handler.Command: %w", err)
-		}
-		if vm.execState == deliveringContent {
-			vm.execState = waitingForContinue
-		}
-
-	case yarnpb.Instruction_ADD_OPTION:
-		// Adds an entry to the option list (see ShowOptions).
-		// - opA = string: string ID for option to add
-		// - opB = string: destination to go to if this option is selected
-		// - opC = number: number of expressions on the stack to insert
-		//   into the line
-		// - opD = bool: whether the option has a condition on it (in which
-		//   case a value should be popped off the stack and used to signal
-		//   the game that the option should be not available)
-		line := Line{
-			ID: inst.Operands[0].GetStringValue(),
-		}
-		if len(inst.Operands) > 2 {
-			n, err := operandToInt(inst.Operands[2])
-			if err != nil {
-				return fmt.Errorf("operandToInt(opC): %w", err)
-			}
-			ss, err := vm.state.popNStrings(n)
-			if err != nil {
-				return fmt.Errorf("popNStrings(%d): %w", n, err)
-			}
-			line.Substitutions = ss
-		}
-		avail := true
-		if len(inst.Operands) > 3 && inst.Operands[3].GetBoolValue() {
-			// Condition must be on the stack as a bool.
-			cp, err := vm.state.popBool()
-			if err != nil {
-				return err
-			}
-			avail = cp
-		}
-		vm.state.options = append(vm.state.options, Option{
-			ID:              len(vm.state.options),
-			Line:            line,
-			DestinationNode: inst.Operands[1].GetStringValue(),
-			IsAvailable:     avail,
-		})
-
-	case yarnpb.Instruction_SHOW_OPTIONS:
-		// Presents the current list of options to the client, then clears
-		// the list. The most recently selected option will be on the top
-		// of the stack when execution resumes.
-		// No operands.
-		if len(vm.state.options) == 0 {
-			// NOTE: jon implements this as a machine stop instead of an exception
-			vm.execState = stopped
-			vm.Handler.DialogueComplete()
-			return ErrNoOptions
-		}
-		vm.execState = waitingOnOptionSelection
-		if err := vm.Handler.Options(vm.state.options); err != nil {
-			return fmt.Errorf("handler.Options: %w", err)
-		}
-		if vm.execState == waitingForContinue {
-			// The handler called SetSelectedOption!
-			vm.execState = running
-		}
-
-	case yarnpb.Instruction_PUSH_STRING:
-		// Pushes a string onto the stack.
-		// opA = string: the string to push to the stack.
-		vm.state.push(inst.Operands[0].GetStringValue())
-
-	case yarnpb.Instruction_PUSH_FLOAT:
-		// Pushes a floating point number onto the stack.
-		// opA = float: number to push to stack
-		vm.state.push(inst.Operands[0].GetFloatValue())
-
-	case yarnpb.Instruction_PUSH_BOOL:
-		// Pushes a boolean onto the stack.
-		// opA = bool: the bool to push to stack
-		vm.state.push(inst.Operands[0].GetBoolValue())
-
-	case yarnpb.Instruction_PUSH_NULL:
-		// Pushes a null value onto the stack.
-		// No operands.
-		vm.state.push(nil)
-
-	case yarnpb.Instruction_JUMP_IF_FALSE:
-		// Jumps to the named position in the the node, if the top of the
-		// stack is not null, zero or false.
-		// opA = string: label name
-		x, err := vm.state.peek()
-		if err != nil {
-			return fmt.Errorf("peek: %w", err)
-		}
-		b, err := convertToBool(x)
-		if err != nil {
-			return fmt.Errorf("convertToBool: %w", err)
-		}
-		if b {
-			// Value is true, so don't jump
-			return nil
-		}
-		k := inst.Operands[0].GetStringValue()
-		pc, ok := vm.state.node.Labels[k]
-		if !ok {
-			return fmt.Errorf("unknown label %q", k)
-		}
-		vm.state.pc = int(pc) - 1
-
-	case yarnpb.Instruction_POP:
-		// Discards top of stack.
-		// No operands.
-		if _, err := vm.state.pop(); err != nil {
-			return fmt.Errorf("pop: %w", err)
-		}
-
-	case yarnpb.Instruction_CALL_FUNC:
-		// Calls a function in the client. Pops as many arguments as the
-		// client indicates the function receives, and the result (if any)
-		// is pushed to the stack.
-		// opA = string: name of the function
-
-		// TODO: typecheck FuncMap during preprocessing
-		// TODO: a lot of this is very forgiving...
-		k := inst.Operands[0].GetStringValue()
-		f, found := vm.FuncMap[k]
-		if !found {
-			return fmt.Errorf("function %q not found", k)
-		}
-		ft := reflect.TypeOf(f)
-		if ft.Kind() != reflect.Func {
-			return fmt.Errorf("function %q not actually a function [type %T]", k, f)
-		}
-		// Compiler puts number of args on top of stack
-		gotx, err := vm.state.pop()
-		if err != nil {
-			return fmt.Errorf("pop: %w", err)
-		}
-		got, err := convertToInt(gotx)
-		if err != nil {
-			return fmt.Errorf("convertToInt: %w", err)
-		}
-		// Check that we have enough args to call the func
-		switch want := ft.NumIn(); {
-		case ft.IsVariadic() && got < want-1:
-			// The last (variadic) arg is free to be empty.
-			return fmt.Errorf("insufficient args [%d < %d]", got, want)
-		case got != want:
-			return fmt.Errorf("wrong number of args [%d != %d]", got, want)
-		}
-
-		// Also check that f either returns {0,1,2} values; the second is
-		// only allowed to be type error.
-		switch {
-		case ft.NumOut() == 2 && ft.Out(1) == errorType:
-			// ok
-		case ft.NumOut() < 2:
-			// ok
-		default:
-			// TODO: elaborate in message
-			return errors.New("wrong number or type of return args")
-		}
-
-		params := make([]reflect.Value, got)
-		for got >= 0 {
-			got--
-			p, err := vm.state.pop()
-			if err != nil {
-				return fmt.Errorf("pop: %w", err)
-			}
-			params[got] = reflect.ValueOf(p)
-		}
-
-		result := reflect.ValueOf(f).Call(params)
-		if len(result) == 2 && !result[1].IsNil() {
-			return result[1].Interface().(error)
-		}
-		if len(result) > 0 {
-			vm.state.push(result[0].Interface())
-		}
-
-	case yarnpb.Instruction_PUSH_VARIABLE:
-		// Pushes the contents of a variable onto the stack.
-		// opA = name of variable
-		k := inst.Operands[0].GetStringValue()
-		v, ok := vm.Vars.GetValue(k)
-		if ok {
-			vm.state.push(v)
-			return nil
-		}
-		// Is it provided as an initial value?
-		w, ok := vm.Program.InitialValues[k]
-		if !ok {
-			return fmt.Errorf("no variable %q in storage or initial values", k)
-		}
-		switch x := w.Value.(type) {
-		case *yarnpb.Operand_BoolValue:
-			vm.state.push(x.BoolValue)
-		case *yarnpb.Operand_FloatValue:
-			vm.state.push(x.FloatValue)
-		case *yarnpb.Operand_StringValue:
-			vm.state.push(x.StringValue)
-		}
-
-	case yarnpb.Instruction_STORE_VARIABLE:
-		// Stores the contents of the top of the stack in the named
-		// variable.
-		// opA = name of variable
-		k := inst.Operands[0].GetStringValue()
-		v, err := vm.state.peek()
-		if err != nil {
-			return fmt.Errorf("peek: %w", err)
-		}
-		vm.Vars.SetValue(k, v)
-
-	case yarnpb.Instruction_STOP:
-		// Stops execution of the program.
-		// No operands.
-		if err := vm.Handler.NodeComplete(vm.state.node.Name); err != nil {
-			return fmt.Errorf("handler.NodeComplete: %w", err)
-		}
-		if err := vm.Handler.DialogueComplete(); err != nil {
-			return fmt.Errorf("handler.DialogueComplete: %w", err)
-		}
+func (vm *VirtualMachine) execShowOptions([]*yarnpb.Operand) error {
+	// Presents the current list of options to the client, then clears
+	// the list. The most recently selected option will be on the top
+	// of the stack when execution resumes.
+	// No operands.
+	if len(vm.state.options) == 0 {
+		// NOTE: jon implements this as a machine stop instead of an exception
 		vm.execState = stopped
-
-	case yarnpb.Instruction_RUN_NODE:
-		// Pops a string off the top of the stack, and runs the node with
-		// that name.
-		// No operands.
-		node, err := vm.state.popString()
-		if err != nil {
-			return fmt.Errorf("popString: %w", err)
-		}
-		if err := vm.Handler.NodeComplete(vm.state.node.Name); err != nil {
-			return fmt.Errorf("handler.NodeComplete: %w", err)
-		}
-		if err := vm.SetNode(node); err != nil {
-			return fmt.Errorf("SetNode: %w", err)
-		}
-		vm.state.pc--
-
-	default:
-		return fmt.Errorf("invalid opcode %v", inst.Opcode)
+		vm.Handler.DialogueComplete()
+		return ErrNoOptions
+	}
+	vm.execState = waitingOnOptionSelection
+	if err := vm.Handler.Options(vm.state.options); err != nil {
+		return fmt.Errorf("handler.Options: %w", err)
+	}
+	if vm.execState == waitingForContinue {
+		// The handler called SetSelectedOption!
+		vm.execState = running
 	}
 	return nil
+}
+
+func (vm *VirtualMachine) execPushString(operands []*yarnpb.Operand) error {
+	// Pushes a string onto the stack.
+	// opA = string: the string to push to the stack.
+	vm.state.push(operands[0].GetStringValue())
+	return nil
+}
+
+func (vm *VirtualMachine) execPushFloat(operands []*yarnpb.Operand) error {
+	// Pushes a floating point number onto the stack.
+	// opA = float: number to push to stack
+	vm.state.push(operands[0].GetFloatValue())
+	return nil
+}
+
+func (vm *VirtualMachine) execPushBool(operands []*yarnpb.Operand) error {
+	// Pushes a boolean onto the stack.
+	// opA = bool: the bool to push to stack
+	vm.state.push(operands[0].GetBoolValue())
+	return nil
+}
+
+func (vm *VirtualMachine) execPushNull([]*yarnpb.Operand) error {
+	// Pushes a null value onto the stack.
+	// No operands.
+	vm.state.push(nil)
+	return nil
+}
+
+func (vm *VirtualMachine) execJumpIfFalse(operands []*yarnpb.Operand) error {
+	// Jumps to the named position in the the node, if the top of the
+	// stack is not null, zero or false.
+	// opA = string: label name
+	x, err := vm.state.peek()
+	if err != nil {
+		return fmt.Errorf("peek: %w", err)
+	}
+	b, err := convertToBool(x)
+	if err != nil {
+		return fmt.Errorf("convertToBool: %w", err)
+	}
+	if b {
+		// Value is true, so don't jump
+		return nil
+	}
+	k := operands[0].GetStringValue()
+	pc, ok := vm.state.node.Labels[k]
+	if !ok {
+		return fmt.Errorf("unknown label %q", k)
+	}
+	vm.state.pc = int(pc) - 1
+	return nil
+}
+
+func (vm *VirtualMachine) execPop([]*yarnpb.Operand) error {
+	// Discards top of stack.
+	// No operands.
+	if _, err := vm.state.pop(); err != nil {
+		return fmt.Errorf("pop: %w", err)
+	}
+	return nil
+}
+
+func (vm *VirtualMachine) execCallFunc(operands []*yarnpb.Operand) error {
+	// Calls a function in the client. Pops as many arguments as the
+	// client indicates the function receives, and the result (if any)
+	// is pushed to the stack.
+	// opA = string: name of the function
+
+	// TODO: typecheck FuncMap during preprocessing
+	// TODO: a lot of this is very forgiving...
+	k := operands[0].GetStringValue()
+	f, found := vm.FuncMap[k]
+	if !found {
+		return fmt.Errorf("function %q not found", k)
+	}
+	ft := reflect.TypeOf(f)
+	if ft.Kind() != reflect.Func {
+		return fmt.Errorf("function %q not actually a function [type %T]", k, f)
+	}
+	// Compiler puts number of args on top of stack
+	gotx, err := vm.state.pop()
+	if err != nil {
+		return fmt.Errorf("pop: %w", err)
+	}
+	got, err := convertToInt(gotx)
+	if err != nil {
+		return fmt.Errorf("convertToInt: %w", err)
+	}
+	// Check that we have enough args to call the func
+	switch want := ft.NumIn(); {
+	case ft.IsVariadic() && got < want-1:
+		// The last (variadic) arg is free to be empty.
+		return fmt.Errorf("insufficient args [%d < %d]", got, want)
+	case got != want:
+		return fmt.Errorf("wrong number of args [%d != %d]", got, want)
+	}
+
+	// Also check that f either returns {0,1,2} values; the second is
+	// only allowed to be type error.
+	switch {
+	case ft.NumOut() == 2 && ft.Out(1) == errorType:
+		// ok
+	case ft.NumOut() < 2:
+		// ok
+	default:
+		// TODO: elaborate in message
+		return errors.New("wrong number or type of return args")
+	}
+
+	params := make([]reflect.Value, got)
+	for got >= 0 {
+		got--
+		p, err := vm.state.pop()
+		if err != nil {
+			return fmt.Errorf("pop: %w", err)
+		}
+		params[got] = reflect.ValueOf(p)
+	}
+
+	result := reflect.ValueOf(f).Call(params)
+	if len(result) == 2 && !result[1].IsNil() {
+		return result[1].Interface().(error)
+	}
+	if len(result) > 0 {
+		vm.state.push(result[0].Interface())
+	}
+	return nil
+}
+
+func (vm *VirtualMachine) execPushVariable(operands []*yarnpb.Operand) error {
+	// Pushes the contents of a variable onto the stack.
+	// opA = name of variable
+	k := operands[0].GetStringValue()
+	v, ok := vm.Vars.GetValue(k)
+	if ok {
+		vm.state.push(v)
+		return nil
+	}
+	// Is it provided as an initial value?
+	w, ok := vm.Program.InitialValues[k]
+	if !ok {
+		return fmt.Errorf("no variable %q in storage or initial values", k)
+	}
+	switch x := w.Value.(type) {
+	case *yarnpb.Operand_BoolValue:
+		vm.state.push(x.BoolValue)
+	case *yarnpb.Operand_FloatValue:
+		vm.state.push(x.FloatValue)
+	case *yarnpb.Operand_StringValue:
+		vm.state.push(x.StringValue)
+	}
+	return nil
+}
+
+func (vm *VirtualMachine) execStoreVariable(operands []*yarnpb.Operand) error {
+	// Stores the contents of the top of the stack in the named
+	// variable.
+	// opA = name of variable
+	k := operands[0].GetStringValue()
+	v, err := vm.state.peek()
+	if err != nil {
+		return fmt.Errorf("peek: %w", err)
+	}
+	vm.Vars.SetValue(k, v)
+	return nil
+}
+
+func (vm *VirtualMachine) execStop([]*yarnpb.Operand) error {
+	// Stops execution of the program.
+	// No operands.
+	if err := vm.Handler.NodeComplete(vm.state.node.Name); err != nil {
+		return fmt.Errorf("handler.NodeComplete: %w", err)
+	}
+	if err := vm.Handler.DialogueComplete(); err != nil {
+		return fmt.Errorf("handler.DialogueComplete: %w", err)
+	}
+	vm.execState = stopped
+	return nil
+}
+
+func (vm *VirtualMachine) execRunNode([]*yarnpb.Operand) error {
+	// Pops a string off the top of the stack, and runs the node with
+	// that name.
+	// No operands.
+	node, err := vm.state.popString()
+	if err != nil {
+		return fmt.Errorf("popString: %w", err)
+	}
+	if err := vm.Handler.NodeComplete(vm.state.node.Name); err != nil {
+		return fmt.Errorf("handler.NodeComplete: %w", err)
+	}
+	if err := vm.SetNode(node); err != nil {
+		return fmt.Errorf("SetNode: %w", err)
+	}
+	vm.state.pc--
+	return nil
+}
+
+var dispatchTable = []func(*VirtualMachine, []*yarnpb.Operand) error{
+	yarnpb.Instruction_JUMP_TO:        (*VirtualMachine).execJumpTo,
+	yarnpb.Instruction_JUMP:           (*VirtualMachine).execJump,
+	yarnpb.Instruction_RUN_LINE:       (*VirtualMachine).execRunLine,
+	yarnpb.Instruction_RUN_COMMAND:    (*VirtualMachine).execRunCommand,
+	yarnpb.Instruction_ADD_OPTION:     (*VirtualMachine).execAddOption,
+	yarnpb.Instruction_SHOW_OPTIONS:   (*VirtualMachine).execShowOptions,
+	yarnpb.Instruction_PUSH_STRING:    (*VirtualMachine).execPushString,
+	yarnpb.Instruction_PUSH_FLOAT:     (*VirtualMachine).execPushFloat,
+	yarnpb.Instruction_PUSH_BOOL:      (*VirtualMachine).execPushBool,
+	yarnpb.Instruction_PUSH_NULL:      (*VirtualMachine).execPushNull,
+	yarnpb.Instruction_JUMP_IF_FALSE:  (*VirtualMachine).execJumpIfFalse,
+	yarnpb.Instruction_POP:            (*VirtualMachine).execPop,
+	yarnpb.Instruction_CALL_FUNC:      (*VirtualMachine).execCallFunc,
+	yarnpb.Instruction_PUSH_VARIABLE:  (*VirtualMachine).execPushVariable,
+	yarnpb.Instruction_STORE_VARIABLE: (*VirtualMachine).execStoreVariable,
+	yarnpb.Instruction_STOP:           (*VirtualMachine).execStop,
+	yarnpb.Instruction_RUN_NODE:       (*VirtualMachine).execRunNode,
+}
+
+func (vm *VirtualMachine) execute(inst *yarnpb.Instruction) error {
+	if inst.Opcode < 0 || int(inst.Opcode) >= len(dispatchTable) {
+		return fmt.Errorf("invalid opcode %v", inst.Opcode)
+	}
+	exec := dispatchTable[inst.Opcode]
+	if exec == nil {
+		return fmt.Errorf("invalid opcode %v", inst.Opcode)
+	}
+	return exec(vm, inst.Operands)
 }
 
 type state struct {

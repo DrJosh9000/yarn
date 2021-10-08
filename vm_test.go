@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	yarnpb "github.com/DrJosh9000/yarn/bytecode"
-	"google.golang.org/protobuf/encoding/prototext"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -45,7 +44,7 @@ func TestVMExample(t *testing.T) {
 		t.Fatalf("proto.Unmarshal: %v", err)
 	}
 
-	log.Printf("program: %v", prototext.Format(&prog))
+	log.Print(FormatProgram(&prog))
 
 	vm := &VirtualMachine{
 		Program:  &prog,
