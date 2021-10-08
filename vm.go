@@ -184,9 +184,8 @@ func (vm *VirtualMachine) Continue() error {
 		pc := vm.state.pc
 		inst := vm.state.node.Instructions[pc]
 		if vm.TraceLog {
+			log.Printf("stack %q; options %v", vm.state.stack, vm.state.options)
 			log.Printf("% 15s %06d %s", vm.state.node.Name, pc, FormatInstruction(inst))
-			log.Printf("stack %q", vm.state.stack)
-			log.Printf("options %v", vm.state.options)
 		}
 		if err := vm.execute(inst); err != nil {
 			return fmt.Errorf("executing %v at %d: %w", inst, pc, err)
