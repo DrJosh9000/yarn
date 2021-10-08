@@ -16,6 +16,7 @@ package yarn
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -32,6 +33,8 @@ type TestStep struct {
 type TestPlan struct {
 	Steps []TestStep
 	Step  int
+
+	DialogueCompleted bool
 
 	StringTable    StringTable
 	VirtualMachine *VirtualMachine
@@ -65,6 +68,9 @@ func ReadTestPlan(r io.Reader) (*TestPlan, error) {
 func (p *TestPlan) Complete() error {
 	if p.Step != len(p.Steps) {
 		return fmt.Errorf("testplan incomplete on step %d", p.Step)
+	}
+	if !p.DialogueCompleted {
+		return errors.New("testplan did not receive DialogueCompleted")
 	}
 	return nil
 }
@@ -133,14 +139,17 @@ func (p *TestPlan) Command(command string) error {
 	return nil
 }
 
+// DialogueComplete records the event in p.DialogueCompleted.
+func (p *TestPlan) DialogueComplete() error {
+	p.DialogueCompleted = true
+	return nil
+}
+
 // NodeStart does nothing.
 func (p *TestPlan) NodeStart(string) error { return nil }
 
 // NodeComplete does nothing.
 func (p *TestPlan) NodeComplete(string) error { return nil }
-
-// DialogueComplete does nothing.
-func (p *TestPlan) DialogueComplete() error { return nil }
 
 // PrepareForLines does nothing.
 func (p *TestPlan) PrepareForLines([]string) error { return nil }

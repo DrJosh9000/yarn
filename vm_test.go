@@ -72,12 +72,9 @@ func TestVMExample(t *testing.T) {
 	if err := vm.SetNode("Start"); err != nil {
 		t.Errorf("vm.SetNode(Start) = %v", err)
 	}
-	for {
+	for !testplan.DialogueCompleted {
 		if err := vm.Continue(); err != nil {
 			t.Errorf("vm.Continue() = %v", err)
-			break
-		}
-		if vm.execState == stopped {
 			break
 		}
 	}
