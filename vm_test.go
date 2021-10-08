@@ -24,6 +24,8 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+const traceOutput = false
+
 func TestVMExample(t *testing.T) {
 	tpf, err := os.Open("testdata/Example.testplan")
 	if err != nil {
@@ -44,13 +46,15 @@ func TestVMExample(t *testing.T) {
 		t.Fatalf("proto.Unmarshal: %v", err)
 	}
 
-	log.Print(FormatProgram(&prog))
+	if traceOutput {
+		log.Print(FormatProgram(&prog))
+	}
 
 	vm := &VirtualMachine{
 		Program:  &prog,
 		Handler:  testplan,
 		Vars:     make(MapVariableStorage),
-		TraceLog: true,
+		TraceLog: traceOutput,
 	}
 	testplan.VM = vm
 

@@ -97,13 +97,16 @@ func (p *TestPlan) Options(opts []Option) error {
 
 func (p *TestPlan) Command(command string) error {
 	// TODO: how are commands handled in real yarnspinner's testplan?
-	if false {
-		step := p.Steps[p.Step]
-		if step.Type != "command" {
-			return fmt.Errorf("testplan got command, want %q", step.Type)
-		}
-		p.Step++
+	if strings.HasPrefix(command, "jump ") {
+		// This is basically RUN_NODE...
+		return p.VM.SetNode(strings.TrimPrefix(command, "jump "))
 	}
+
+	step := p.Steps[p.Step]
+	if step.Type != "command" {
+		return fmt.Errorf("testplan got command, want %q", step.Type)
+	}
+	p.Step++
 	// TODO: check the command
 	return nil
 }

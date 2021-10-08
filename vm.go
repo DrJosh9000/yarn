@@ -21,7 +21,6 @@ import (
 	"log"
 	"reflect"
 	"strings"
-	"sync"
 
 	yarnpb "github.com/DrJosh9000/yarn/bytecode"
 )
@@ -87,7 +86,6 @@ const (
 
 // VirtualMachine implements the Yarn Spinner virtual machine.
 type VirtualMachine struct {
-	stateMu   sync.RWMutex
 	execState execState
 	state     state
 
@@ -113,12 +111,17 @@ func (vm *VirtualMachine) SetNode(name string) error {
 		return fmt.Errorf("node %q not found", name)
 	}
 
+	// Designate the current node complete.
+	if vm.state.node != nil {
+		if err := vm.Handler.NodeComplete(vm.state.node.Name); err != nil {
+			return fmt.Errorf("handler.NodeComplete: %w", err)
+		}
+	}
+
 	// Reset the state and start at this node.
-	vm.stateMu.Lock()
 	vm.state = state{
 		node: node,
 	}
-	vm.stateMu.Unlock()
 	if err := vm.Handler.NodeStart(name); err != nil {
 		return fmt.Errorf("handler.NodeStart: %w", err)
 	}
@@ -140,8 +143,6 @@ func (vm *VirtualMachine) SetNode(name string) error {
 // SetSelectedOption sets the option selected by the player. Call this once the
 // player has chosen an option.
 func (vm *VirtualMachine) SetSelectedOption(index int) error {
-	vm.stateMu.Lock()
-	defer vm.stateMu.Unlock()
 	if vm.execState != waitingOnOptionSelection {
 		return fmt.Errorf("not waiting for an option selection [m.execState = %d]", vm.execState)
 	}
@@ -156,9 +157,7 @@ func (vm *VirtualMachine) SetSelectedOption(index int) error {
 
 // Stop stops the virtual machine.
 func (vm *VirtualMachine) Stop() {
-	vm.stateMu.Lock()
 	vm.execState = stopped
-	vm.stateMu.Unlock()
 }
 
 // Continue continues executing the VM.
@@ -190,7 +189,6 @@ func (vm *VirtualMachine) Continue() error {
 		if err := vm.execute(inst); err != nil {
 			return fmt.Errorf("executing %v at %d: %w", inst, pc, err)
 		}
-		vm.state.pc++
 		if proglen := len(vm.state.node.Instructions); vm.state.pc >= proglen {
 			if err := vm.Handler.NodeComplete(vm.state.node.Name); err != nil {
 				return fmt.Errorf("handler.NodeComplete: %w", err)
@@ -212,7 +210,7 @@ func (vm *VirtualMachine) execJumpTo(operands []*yarnpb.Operand) error {
 	if !ok {
 		return fmt.Errorf("unknown label %q in node %q", k, vm.state.node.Name)
 	}
-	vm.state.pc = int(pc) - 1
+	vm.state.pc = int(pc)
 	return nil
 }
 
@@ -228,7 +226,7 @@ func (vm *VirtualMachine) execJump([]*yarnpb.Operand) error {
 	if !ok {
 		return fmt.Errorf("unknown label %q in node %q", k, vm.state.node.Name)
 	}
-	vm.state.pc = int(pc) - 1
+	vm.state.pc = int(pc)
 	return nil
 }
 
@@ -259,6 +257,7 @@ func (vm *VirtualMachine) execRunLine(operands []*yarnpb.Operand) error {
 	if vm.execState == deliveringContent {
 		vm.execState = waitingForContinue
 	}
+	vm.state.pc++
 	return nil
 }
 
@@ -282,6 +281,8 @@ func (vm *VirtualMachine) execRunCommand(operands []*yarnpb.Operand) error {
 			cmd = strings.Replace(cmd, fmt.Sprintf("{%d}", i), s, -1)
 		}
 	}
+	// Just because the command could affect PC, increment first
+	vm.state.pc++
 	vm.execState = deliveringContent
 	if err := vm.Handler.Command(cmd); err != nil {
 		return fmt.Errorf("handler.Command: %w", err)
@@ -330,6 +331,7 @@ func (vm *VirtualMachine) execAddOption(operands []*yarnpb.Operand) error {
 		DestinationNode: operands[1].GetStringValue(),
 		IsAvailable:     avail,
 	})
+	vm.state.pc++
 	return nil
 }
 
@@ -352,6 +354,7 @@ func (vm *VirtualMachine) execShowOptions([]*yarnpb.Operand) error {
 		// The handler called SetSelectedOption!
 		vm.execState = running
 	}
+	vm.state.pc++
 	return nil
 }
 
@@ -359,6 +362,7 @@ func (vm *VirtualMachine) execPushString(operands []*yarnpb.Operand) error {
 	// Pushes a string onto the stack.
 	// opA = string: the string to push to the stack.
 	vm.state.push(operands[0].GetStringValue())
+	vm.state.pc++
 	return nil
 }
 
@@ -366,6 +370,7 @@ func (vm *VirtualMachine) execPushFloat(operands []*yarnpb.Operand) error {
 	// Pushes a floating point number onto the stack.
 	// opA = float: number to push to stack
 	vm.state.push(operands[0].GetFloatValue())
+	vm.state.pc++
 	return nil
 }
 
@@ -373,6 +378,7 @@ func (vm *VirtualMachine) execPushBool(operands []*yarnpb.Operand) error {
 	// Pushes a boolean onto the stack.
 	// opA = bool: the bool to push to stack
 	vm.state.push(operands[0].GetBoolValue())
+	vm.state.pc++
 	return nil
 }
 
@@ -380,6 +386,7 @@ func (vm *VirtualMachine) execPushNull([]*yarnpb.Operand) error {
 	// Pushes a null value onto the stack.
 	// No operands.
 	vm.state.push(nil)
+	vm.state.pc++
 	return nil
 }
 
@@ -404,7 +411,7 @@ func (vm *VirtualMachine) execJumpIfFalse(operands []*yarnpb.Operand) error {
 	if !ok {
 		return fmt.Errorf("unknown label %q", k)
 	}
-	vm.state.pc = int(pc) - 1
+	vm.state.pc = int(pc)
 	return nil
 }
 
@@ -414,6 +421,7 @@ func (vm *VirtualMachine) execPop([]*yarnpb.Operand) error {
 	if _, err := vm.state.pop(); err != nil {
 		return fmt.Errorf("pop: %w", err)
 	}
+	vm.state.pc++
 	return nil
 }
 
@@ -474,6 +482,9 @@ func (vm *VirtualMachine) execCallFunc(operands []*yarnpb.Operand) error {
 		params[got] = reflect.ValueOf(p)
 	}
 
+	// Just because the command could affect PC, increment first
+	vm.state.pc++
+
 	result := reflect.ValueOf(f).Call(params)
 	if len(result) == 2 && !result[1].IsNil() {
 		return result[1].Interface().(error)
@@ -506,6 +517,7 @@ func (vm *VirtualMachine) execPushVariable(operands []*yarnpb.Operand) error {
 	case *yarnpb.Operand_StringValue:
 		vm.state.push(x.StringValue)
 	}
+	vm.state.pc++
 	return nil
 }
 
@@ -519,6 +531,7 @@ func (vm *VirtualMachine) execStoreVariable(operands []*yarnpb.Operand) error {
 		return fmt.Errorf("peek: %w", err)
 	}
 	vm.Vars.SetValue(k, v)
+	vm.state.pc++
 	return nil
 }
 
@@ -543,13 +556,9 @@ func (vm *VirtualMachine) execRunNode([]*yarnpb.Operand) error {
 	if err != nil {
 		return fmt.Errorf("popString: %w", err)
 	}
-	if err := vm.Handler.NodeComplete(vm.state.node.Name); err != nil {
-		return fmt.Errorf("handler.NodeComplete: %w", err)
-	}
 	if err := vm.SetNode(node); err != nil {
 		return fmt.Errorf("SetNode: %w", err)
 	}
-	vm.state.pc--
 	return nil
 }
 
