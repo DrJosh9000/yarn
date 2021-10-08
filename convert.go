@@ -67,30 +67,6 @@ func convertToInt(x interface{}) (int, error) {
 	}
 }
 
-func convertToFloat(x interface{}) (float64, error) {
-	if x == nil {
-		return 0.0, nil
-	}
-	switch t := x.(type) {
-	case bool:
-		if t {
-			return 1.0, nil
-		}
-		return 0.0, nil
-	case float64:
-		return t, nil
-	case int:
-		return float64(t), nil
-	case string:
-		return strconv.ParseFloat(t, 64)
-	default:
-		if t == nil {
-			return 0.0, nil
-		}
-		return 0.0, fmt.Errorf("cannot convert value of type %T to float64", x)
-	}
-}
-
 func operandToInt(op *yarnpb.Operand) (int, error) {
 	if op == nil {
 		return 0, errors.New("nil operand")
