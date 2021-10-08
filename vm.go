@@ -187,16 +187,10 @@ func (vm *VirtualMachine) Continue() error {
 			log.Printf("% 15s %06d %s", vm.state.node.Name, pc, FormatInstruction(inst))
 		}
 		if err := vm.execute(inst); err != nil {
-			return fmt.Errorf("%s %06d %s: %w", vm.state.node.Name, pc, inst, err)
+			return fmt.Errorf("%s %06d %s: %w", vm.state.node.Name, pc, FormatInstruction(inst), err)
 		}
 		if proglen := len(vm.state.node.Instructions); vm.state.pc >= proglen {
-			if err := vm.Handler.NodeComplete(vm.state.node.Name); err != nil {
-				return fmt.Errorf("handler.NodeComplete: %w", err)
-			}
-			vm.execState = stopped
-			if err := vm.Handler.DialogueComplete(); err != nil {
-				return fmt.Errorf("handler.DialogueComplete: %w", err)
-			}
+			return vm.execStop(nil)
 		}
 	}
 	return nil
