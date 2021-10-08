@@ -138,7 +138,7 @@ func (vm *VirtualMachine) SetNode(name string) error {
 }
 
 // SetSelectedOption sets the option selected by the player. Call this once the
-// player has chosen an option. The machine will be returned to Suspended state.
+// player has chosen an option.
 func (vm *VirtualMachine) SetSelectedOption(index int) error {
 	vm.stateMu.Lock()
 	defer vm.stateMu.Unlock()
