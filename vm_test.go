@@ -69,15 +69,14 @@ func TestVMExample(t *testing.T) {
 	testplan.StringTable = st
 	testplan.VirtualMachine = vm
 
-	if err := vm.SetNode("Start"); err != nil {
-		t.Errorf("vm.SetNode(Start) = %v", err)
-	}
-	for !testplan.DialogueCompleted {
-		if err := vm.Continue(); err != nil {
-			t.Errorf("vm.Continue() = %v", err)
-			break
+	done := make(chan struct{})
+	go func() {
+		if err := vm.Run("Start"); err != nil {
+			t.Errorf("vm.Run() = %v", err)
 		}
-	}
+		close(done)
+	}()
+	<-done
 	if err := testplan.Complete(); err != nil {
 		t.Errorf("testplan incomplete: %v", err)
 	}

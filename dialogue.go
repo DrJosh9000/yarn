@@ -56,8 +56,9 @@ type DialogueHandler interface {
 	Line(line Line) error
 
 	// Options is called to deliver a set of options to the game. The player
-	// should choose one of the options.
-	Options(options []Option) error
+	// should choose one of the options, and Options should return the ID of the
+	// chosen option.
+	Options(options []Option) (int, error)
 
 	// Command is called when the dialogue system runs a command.
 	Command(command string) error

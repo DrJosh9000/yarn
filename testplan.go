@@ -94,32 +94,32 @@ func (p *TestPlan) Line(line Line) error {
 
 // Options checks that the options match those expected by the plan, then
 // selects the option specified in the plan.
-func (p *TestPlan) Options(opts []Option) error {
+func (p *TestPlan) Options(opts []Option) (int, error) {
 	for _, opt := range opts {
 		step := p.Steps[p.Step]
 		if step.Type != "option" {
-			return fmt.Errorf("testplan got option, want %q", step.Type)
+			return 0, fmt.Errorf("testplan got option, want %q", step.Type)
 		}
 		p.Step++
 		row, found := p.StringTable[opt.Line.ID]
 		if !found {
-			return fmt.Errorf("no string %q in string table", opt.Line.ID)
+			return 0, fmt.Errorf("no string %q in string table", opt.Line.ID)
 		}
 		if row.Text != step.Contents {
-			return fmt.Errorf("testplan got line %q, want %q", row.Text, step.Contents)
+			return 0, fmt.Errorf("testplan got line %q, want %q", row.Text, step.Contents)
 		}
 	}
 	// Next step should be a select
 	step := p.Steps[p.Step]
 	if step.Type != "select" {
-		return fmt.Errorf("testplan got select, want %q", step.Type)
+		return 0, fmt.Errorf("testplan got select, want %q", step.Type)
 	}
 	p.Step++
 	n, err := strconv.Atoi(step.Contents)
 	if err != nil {
-		return fmt.Errorf("converting testplan step to int: %w", err)
+		return 0, fmt.Errorf("converting testplan step to int: %w", err)
 	}
-	return p.VirtualMachine.SetSelectedOption(n - 1)
+	return n - 1, nil
 }
 
 // Command handles the command... somehow.

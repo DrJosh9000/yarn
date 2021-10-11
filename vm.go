@@ -57,37 +57,17 @@ var (
 	// ErrWrongType indicates the program needed a value of one type, but got
 	// something else instead.
 	ErrWrongType = errors.New("wrong type")
+
+	// Internal error for signifying a machine stop.
+	errStop = errors.New("stopped")
 )
 
 // Used to check the second return arg of functions in FuncMap.
 var errorType = reflect.TypeOf((*error)(nil)).Elem()
 
-// execState is the highest-level machine state.
-type execState int
-
-const (
-	// The Virtual Machine is not running a node.
-	stopped = execState(iota)
-
-	// The Virtual Machine is waiting on option selection.
-	waitingOnOptionSelection
-
-	//The VirtualMachine has finished delivering content to the
-	// client game, and is waiting for Continue to be called.
-	waitingForContinue
-
-	// The VirtualMachine is delivering a line, options, or a
-	// command to the client game.
-	deliveringContent
-
-	// The VirtualMachine is in the middle of executing code.
-	running
-)
-
 // VirtualMachine implements the Yarn Spinner virtual machine.
 type VirtualMachine struct {
-	execState execState
-	state     state
+	state state
 
 	// Program to execute
 	Program *yarnpb.Program
@@ -140,58 +120,38 @@ func (vm *VirtualMachine) SetNode(name string) error {
 	return nil
 }
 
-// SetSelectedOption sets the option selected by the player. Call this once the
-// player has chosen an option.
-func (vm *VirtualMachine) SetSelectedOption(index int) error {
-	if vm.execState != waitingOnOptionSelection {
-		return fmt.Errorf("not waiting for an option selection [m.execState = %d]", vm.execState)
-	}
-	if optslen := len(vm.state.options); index < 0 || index >= optslen {
-		return fmt.Errorf("selected option %d out of bounds [0, %d)", index, optslen)
-	}
-	vm.state.push(vm.state.options[index].DestinationNode)
-	vm.state.options = nil
-	vm.execState = waitingForContinue
-	return nil
-}
-
-// Stop stops the virtual machine.
-func (vm *VirtualMachine) Stop() {
-	vm.execState = stopped
-}
-
-// Continue continues executing the VM.
-func (vm *VirtualMachine) Continue() error {
-	if vm.state.node == nil {
-		return ErrNoNodeSelected
-	}
-	if vm.execState == waitingOnOptionSelection {
-		return ErrWaitingOnOptionSelection
-	}
+// Run executes the VM.
+func (vm *VirtualMachine) Run(startNode string) error {
 	if vm.Handler == nil {
 		return ErrNilDialogueHandler
 	}
 	if vm.Vars == nil {
 		return ErrNilVariableStorage
 	}
-	if vm.execState == deliveringContent {
-		vm.execState = running
-		return nil
+	if err := vm.SetNode(startNode); err != nil {
+		return err
 	}
-	vm.execState = running
-	for vm.execState == running {
-		pc := vm.state.pc
-		inst := vm.state.node.Instructions[pc]
+	for vm.state.pc < len(vm.state.node.Instructions) {
+		inst := vm.state.node.Instructions[vm.state.pc]
 		if vm.TraceLog {
 			log.Printf("stack %q; options %v", vm.state.stack, vm.state.options)
-			log.Printf("% 15s %06d %s", vm.state.node.Name, pc, FormatInstruction(inst))
+			log.Printf("% 15s %06d %s", vm.state.node.Name, vm.state.pc, FormatInstruction(inst))
 		}
-		if err := vm.execute(inst); err != nil {
-			return fmt.Errorf("%s %06d %s: %w", vm.state.node.Name, pc, FormatInstruction(inst), err)
+		err := vm.execute(inst)
+		if err == errStop {
+			// machine has stopped
+			break
 		}
-		if proglen := len(vm.state.node.Instructions); vm.state.pc >= proglen {
-			return vm.execStop(nil)
+		if err != nil {
+			// exception
+			return fmt.Errorf("%s %06d %s: %w", vm.state.node.Name, vm.state.pc, FormatInstruction(inst), err)
 		}
+	}
+	if err := vm.Handler.NodeComplete(vm.state.node.Name); err != nil {
+		return fmt.Errorf("handler.NodeComplete: %w", err)
+	}
+	if err := vm.Handler.DialogueComplete(); err != nil {
+		return fmt.Errorf("handler.DialogueComplete: %w", err)
 	}
 	return nil
 }
@@ -244,12 +204,8 @@ func (vm *VirtualMachine) execRunLine(operands []*yarnpb.Operand) error {
 		}
 		line.Substitutions = ss
 	}
-	vm.execState = deliveringContent
 	if err := vm.Handler.Line(line); err != nil {
 		return fmt.Errorf("handler.Line: %w", err)
-	}
-	if vm.execState == deliveringContent {
-		vm.execState = waitingForContinue
 	}
 	vm.state.pc++
 	return nil
@@ -277,12 +233,8 @@ func (vm *VirtualMachine) execRunCommand(operands []*yarnpb.Operand) error {
 	}
 	// Just because the command could affect PC, increment first
 	vm.state.pc++
-	vm.execState = deliveringContent
 	if err := vm.Handler.Command(cmd); err != nil {
 		return fmt.Errorf("handler.Command: %w", err)
-	}
-	if vm.execState == deliveringContent {
-		vm.execState = waitingForContinue
 	}
 	return nil
 }
@@ -336,18 +288,18 @@ func (vm *VirtualMachine) execShowOptions([]*yarnpb.Operand) error {
 	// No operands.
 	if len(vm.state.options) == 0 {
 		// NOTE: jon implements this as a machine stop instead of an exception
-		vm.execState = stopped
 		vm.Handler.DialogueComplete()
 		return ErrNoOptions
 	}
-	vm.execState = waitingOnOptionSelection
-	if err := vm.Handler.Options(vm.state.options); err != nil {
+	index, err := vm.Handler.Options(vm.state.options)
+	if err != nil {
 		return fmt.Errorf("handler.Options: %w", err)
 	}
-	if vm.execState == waitingForContinue {
-		// The handler called SetSelectedOption!
-		vm.execState = running
+	if optslen := len(vm.state.options); index < 0 || index >= optslen {
+		return fmt.Errorf("selected option %d out of bounds [0, %d)", index, optslen)
 	}
+	vm.state.push(vm.state.options[index].DestinationNode)
+	vm.state.options = nil
 	vm.state.pc++
 	return nil
 }
@@ -532,14 +484,7 @@ func (vm *VirtualMachine) execStoreVariable(operands []*yarnpb.Operand) error {
 func (vm *VirtualMachine) execStop([]*yarnpb.Operand) error {
 	// Stops execution of the program.
 	// No operands.
-	if err := vm.Handler.NodeComplete(vm.state.node.Name); err != nil {
-		return fmt.Errorf("handler.NodeComplete: %w", err)
-	}
-	if err := vm.Handler.DialogueComplete(); err != nil {
-		return fmt.Errorf("handler.DialogueComplete: %w", err)
-	}
-	vm.execState = stopped
-	return nil
+	return errStop
 }
 
 func (vm *VirtualMachine) execRunNode([]*yarnpb.Operand) error {
