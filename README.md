@@ -12,98 +12,97 @@ options, and commands to the handler.
 
 ## Usage
 
-1.  Compile your `.yarn` file, e.g. with the 
-    [YarnSpinner Console](https://github.com/YarnSpinnerTool/YarnSpinner-Console):
-    ```shell
-    $ ysc compile Example.yarn
-    ```
-    This produces two files: the VM bytecode `.yarnc`, and a string table
-    `.csv`.
+1. Compile your `.yarn` file, e.g. with the
+   [YarnSpinner Console](https://github.com/YarnSpinnerTool/YarnSpinner-Console):
 
-2.  Implement a `DialogueHandler`, which receives events from the VM. Here's an
-    example that plays the dialogue on the terminal:
+   ```shell
+   ysc compile Example.yarn
+   ```
 
-    ```go
-    type MyHandler struct{
-        stringTable yarn.StringTable
-        // ... and your own fields ...
-    }
+   This produces two files: the VM bytecode `.yarnc`, and a string table
+   `.csv`.
 
-    func (m *MyHandler) Line(line yarn.Line) error {
-        // line.ID is the key into the string table.
-        // StringTableRow.Text is the "string".
-        fmt.Println(m.stringTable[line.ID].Text)
-        // You can block in here to give the player time to read the text.
-        fmt.Println("\n\nPress ENTER to continue")
-        fmt.Scanln()
-        return nil
-    }
+2. Implement a `DialogueHandler`, which receives events from the VM. Here's an
+   example that plays the dialogue on the terminal:
 
-    func (m *MyHandler) Options(opts []yarn.Option) (int, error) {
-        fmt.Println("Choose:")
-        for _, opt := range opts {
-            fmt.Printf("%d: %s\n", opt.ID, m.stringTable[opt.Line.ID].Text)
-        }
-        fmt.Print("Enter the number of your choice: ")
-        var choice int
-        fmt.Scanf("%d", &choice)
-        return choice, nil
-    }
+   ```go
+   type MyHandler struct{
+       stringTable yarn.StringTable
+       // ... and your own fields ...
+   }
 
-    // ... and also the other methods. 
-    ```
-    
-    See `cmd/yarnrunner.go` for a complete example.
+   func (m *MyHandler) Line(line yarn.Line) error {
+       // line.ID is the key into the string table.
+       // StringTableRow.Text is the "string".
+       fmt.Println(m.stringTable[line.ID].Text)
+       // You can block in here to give the player time to read the text.
+       fmt.Println("\n\nPress ENTER to continue")
+       fmt.Scanln()
+       return nil
+   }
 
-3.  Load the two files, your `DialogueHandler`, and a `VariableStorage` into a
-    `VirtualMachine`, and then pass the name of the first node to `Run`:
-    ```go
-    package main
+   func (m *MyHandler) Options(opts []yarn.Option) (int, error) {
+       fmt.Println("Choose:")
+       for _, opt := range opts {
+           fmt.Printf("%d: %s\n", opt.ID, m.stringTable[opt.Line.ID].Text)
+       }
+       fmt.Print("Enter the number of your choice: ")
+       var choice int
+       fmt.Scanf("%d", &choice)
+       return choice, nil
+   }
 
-    import (
-        "io/ioutil"
-        "os"
+   // ... and also the other methods. 
+   ```
 
-        "google.golang.org/protobuf/proto"
-        "github.com/DrJosh9000/yarn"
-        yarnpb "github.com/DrJosh9000/yarn/bytecode"
-    )
+   See `cmd/yarnrunner.go` for a complete example.
 
-    func main() {
-        // Load the files:
-        // (error handling omitted for brevity)
-        yarnc, _ := ioutil.ReadFile("Example.yarn.yarnc")
-        program := new(yarnpb.Program)
-        proto.Unmarshal(yarnc, program)
+3. Load the two files, your `DialogueHandler`, and a `VariableStorage` into a
+   `VirtualMachine`, and then pass the name of the first node to `Run`:
 
-        csv, _ := os.Open("Example.yarn.csv")
-        defer csv.Close()
-        stringTable, _ := yarn.ReadStringTable(csv)
-
-        // Set up the DialogueHandler and the VirtualMachine:
-        myHandler := &MyHandler{
-            stringTable: stringTable,
-        }
-        vm := &yarn.VirtualMachine{
-            Program: program,
-            Handler: myHandler,
-            Vars: make(yarn.MapVariableStorage), 
-            // or your own VariableStorage implementation
-        }
-
-        // Run the VirtualMachine!
-        if err := vm.Run("Start"); err != nil {
-            log.Printf("VirtualMachine exeption: %v", err)
-        }
-    }
-    ```
+   ```go
+   package main
+   
+   import (
+       "io/ioutil"
+       "os"
+       "google.golang.org/protobuf/proto"
+       "github.com/DrJosh9000/yarn"
+       yarnpb "github.com/DrJosh9000/yarn/bytecode"
+   )
+   
+   func main() {
+       // Load the files:
+       // (error handling omitted for brevity)
+       yarnc, _ := ioutil.ReadFile("Example.yarn.yarnc")
+       program := new(yarnpb.Program)
+       proto.Unmarshal(yarnc, program)
+       csv, _ := os.Open("Example.yarn.csv")
+       defer csv.Close()
+       stringTable, _ := yarn.ReadStringTable(csv)
+       // Set up the DialogueHandler and the VirtualMachine:
+       myHandler := &MyHandler{
+           stringTable: stringTable,
+       }
+       vm := &yarn.VirtualMachine{
+           Program: program,
+           Handler: myHandler,
+           Vars: make(yarn.MapVariableStorage), 
+           // or your own VariableStorage implementation
+       }
+       // Run the VirtualMachine!
+       if err := vm.Run("Start"); err != nil {
+           log.Printf("VirtualMachine exeption: %v", err)
+       }
+   }
+   ```
 
 In a more typical game, `vm.Run` would happen in a separate goroutine. To avoid
 the VM delivering all the lines and options at once, your `DialogueHandler` is
 free to block execution - for example, on a channel operation:
 
 ```go
-type MyHandler struct{
+type MyHandler struct {
     stringTable yarn.StringTable
 
     dialogueDisplay Component
