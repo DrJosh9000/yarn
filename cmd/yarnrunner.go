@@ -1,6 +1,20 @@
 //go:build example
 // +build example
 
+// Copyright 2021 Josh Deprez
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 // The yarnrunner binary runs a yarnc+string table combo as a "text game" on
 // the terminal.
 // The "example" build tag is used to prevent this being installed to go/bin
@@ -58,7 +72,7 @@ func main() {
 		Handler: h,
 		Vars:    make(yarn.MapVariableStorage),
 	}
-	h.vm = vm
+	h.virtualMachine = vm
 
 	if err := vm.Run("Start"); err != nil {
 		log.Printf("VirtualMachine exeption: %v", err)
@@ -68,14 +82,17 @@ func main() {
 // dialogueHandler implements yarn.DialogueHandler by playing the lines and
 // options on the terminal.
 type dialogueHandler struct {
-	stringTable yarn.StringTable
-	vm          *yarn.VirtualMachine
+	stringTable    yarn.StringTable
+	virtualMachine *yarn.VirtualMachine
 }
 
 func (h *dialogueHandler) Line(line yarn.Line) error {
 	fmt.Println(h.stringTable[line.ID].Text)
-	fmt.Println("\n(Press ENTER to continue)")
+	fmt.Print("(Press ENTER to continue)")
 	fmt.Scanln()
+	// This next string is VT100 for "move to the first column, go up a line,
+	// and erase it" (erasing the Press ENTER message).
+	fmt.Print("\r\033[A\033[2K")
 	return nil
 }
 
@@ -84,17 +101,21 @@ func (h *dialogueHandler) Options(opts []yarn.Option) (int, error) {
 	for _, opt := range opts {
 		fmt.Printf("%d: %s\n", opt.ID, h.stringTable[opt.Line.ID].Text)
 	}
-	fmt.Print("Enter the number corresponding to your choice: ")
 	var choice int
-	fmt.Scanf("%d", &choice)
-	fmt.Println()
+	for {
+		fmt.Print("Enter the number corresponding to your choice: ")
+		if _, err := fmt.Scanln(&choice); err != nil {
+			continue
+		}
+		break
+	}
 	return choice, nil
 }
 
 func (h *dialogueHandler) Command(command string) error {
 	// Just implement "jump" for this example
 	if strings.HasPrefix(command, "jump ") {
-		return h.vm.SetNode(strings.TrimPrefix(command, "jump "))
+		return h.virtualMachine.SetNode(strings.TrimPrefix(command, "jump "))
 	}
 	return nil
 }
