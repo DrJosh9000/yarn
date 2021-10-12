@@ -77,11 +77,17 @@ func TestAllTestPlans(t *testing.T) {
 				Handler: testplan,
 				Vars:    make(MapVariableStorage),
 				FuncMap: FuncMap{
+					// Used by various
 					"assert": func(x bool) error {
 						if !x {
 							return errors.New("assertion failed")
 						}
 						return nil
+					},
+					// Used by Functions.yarn
+					// TODO: use ints like the real YarnSpinner
+					"add_three_operands": func(x, y, z float32) float32 {
+						return x + y + z
 					},
 				},
 				TraceLog: traceOutput,

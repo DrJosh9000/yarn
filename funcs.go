@@ -35,63 +35,22 @@ func defaultFuncMap() FuncMap {
 	return FuncMap{
 		"None":                 func(x interface{}) interface{} { return x },
 		"EqualTo":              func(x, y interface{}) bool { return x == y },
-		"GreaterThan":          funcGreaterThan,
-		"GreaterThanOrEqualTo": funcGreaterThanOrEqualTo,
-		"LessThan":             funcLessThan,
-		"LessThanOrEqualTo":    funcLessThanOrEqualTo,
+		"GreaterThan":          func(x, y float32) bool { return x > y },
+		"GreaterThanOrEqualTo": func(x, y float32) bool { return x >= y },
+		"LessThan":             func(x, y float32) bool { return x < y },
+		"LessThanOrEqualTo":    func(x, y float32) bool { return x <= y },
 		"NotEqualTo":           func(x, y interface{}) bool { return x != y },
 		"Or":                   func(x, y bool) bool { return x || y },
 		"And":                  func(x, y bool) bool { return x && y },
 		"Xor":                  func(x, y bool) bool { return x != y },
 		"Not":                  func(x bool) bool { return !x },
-		"UnaryMinus":           funcUnaryMinus,
+		"UnaryMinus":           func(x float32) float32 { return -x },
 		"Add":                  funcAdd,
 		"Minus":                func(x, y float32) float32 { return x - y },
 		"Multiply":             func(x, y float32) float32 { return x * y },
 		"Divide":               func(x, y float32) float32 { return x / y },
 		"Modulo":               func(x, y float32) float32 { return float32(int(x) % int(y)) },
 	}
-}
-
-func funcGreaterThan(x, y interface{}) (bool, error) {
-	switch xt := x.(type) {
-	case string:
-		yt, ok := y.(string)
-		if !ok {
-			return false, fmt.Errorf("mismatching types [%T != string]", y)
-		}
-		return xt > yt, nil
-	case float32:
-		yt, ok := y.(float32)
-		if !ok {
-			return false, fmt.Errorf("mismatching types [%T != float32]", y)
-		}
-		return xt > yt, nil
-	}
-	return false, fmt.Errorf("unsupported type [%T ∉ {float32,string}]", x)
-}
-
-func funcGreaterThanOrEqualTo(x, y interface{}) (bool, error) {
-	if x == y {
-		return true, nil
-	}
-	return funcGreaterThan(x, y)
-}
-
-func funcLessThan(x, y interface{}) (bool, error) {
-	return funcGreaterThan(y, x)
-}
-
-func funcLessThanOrEqualTo(x, y interface{}) (bool, error) {
-	return funcGreaterThanOrEqualTo(y, x)
-}
-
-func funcUnaryMinus(x interface{}) (interface{}, error) {
-	xt, ok := x.(float32)
-	if !ok {
-		return nil, fmt.Errorf("unsupported type [%T != float32]", x)
-	}
-	return -xt, nil
 }
 
 func funcAdd(x, y interface{}) (interface{}, error) {
