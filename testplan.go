@@ -131,11 +131,18 @@ func (p *TestPlan) Options(opts []Option) (int, error) {
 
 // Command handles the command... somehow.
 func (p *TestPlan) Command(command string) error {
-	// TODO: how are commands handled in real yarnspinner's testplan?
+	// Handle v2 "commands" compiled by the v1 compiler.
 	if strings.HasPrefix(command, "jump ") {
-		// This is basically RUN_NODE...
+		// v2 should compile this as RUN_NODE ?
 		return p.VirtualMachine.SetNode(strings.TrimPrefix(command, "jump "))
 	}
+	if strings.HasPrefix(command, "declare ") {
+		// v2 compiler uses this for variable type info and initial value.
+		// It has no imperitive effect.
+		return nil
+	}
+
+	// TODO: how are commands handled in real yarnspinner's testplan?
 	if p.Step >= len(p.Steps) {
 		return errors.New("next testplan step after end")
 	}

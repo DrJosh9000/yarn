@@ -53,6 +53,8 @@ func convertToInt(x interface{}) (int, error) {
 			return 1, nil
 		}
 		return 0, nil
+	case float32:
+		return int(t), nil
 	case float64:
 		return int(t), nil
 	case int:

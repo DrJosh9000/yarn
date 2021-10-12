@@ -75,7 +75,7 @@ type VirtualMachine struct {
 	// Handlers / callbacks
 	Handler DialogueHandler
 	Vars    VariableStorage
-	FuncMap map[string]interface{} // works a bit like text/template.FuncMap
+	FuncMap FuncMap
 
 	// Debugging options
 	TraceLog bool
@@ -128,9 +128,13 @@ func (vm *VirtualMachine) Run(startNode string) error {
 	if vm.Vars == nil {
 		return ErrNilVariableStorage
 	}
+	// Provide default funcs, merge provided funcmap to allow overrides.
+	vm.FuncMap = defaultFuncMap().merge(vm.FuncMap)
+	// Set start node
 	if err := vm.SetNode(startNode); err != nil {
 		return err
 	}
+	// Run!
 	for vm.state.pc < len(vm.state.node.Instructions) {
 		inst := vm.state.node.Instructions[vm.state.pc]
 		if vm.TraceLog {
@@ -419,7 +423,7 @@ func (vm *VirtualMachine) execCallFunc(operands []*yarnpb.Operand) error {
 	}
 
 	params := make([]reflect.Value, got)
-	for got >= 0 {
+	for got > 0 {
 		got--
 		p, err := vm.state.pop()
 		if err != nil {
@@ -432,10 +436,16 @@ func (vm *VirtualMachine) execCallFunc(operands []*yarnpb.Operand) error {
 	vm.state.pc++
 
 	result := reflect.ValueOf(f).Call(params)
-	if len(result) == 2 && !result[1].IsNil() {
-		return result[1].Interface().(error)
+
+	// Error?
+	if last := ft.NumOut() - 1; len(result) > 0 && ft.Out(last) == errorType {
+		if err := result[1].Interface().(error); err != nil {
+			return err
+		}
 	}
-	if len(result) > 0 {
+
+	// A return value?
+	if len(result) > 0 && ft.Out(0) != errorType {
 		vm.state.push(result[0].Interface())
 	}
 	return nil
