@@ -138,7 +138,7 @@ func (vm *VirtualMachine) Run(startNode string) error {
 	for vm.state.pc < len(vm.state.node.Instructions) {
 		inst := vm.state.node.Instructions[vm.state.pc]
 		if vm.TraceLog {
-			log.Printf("stack %q; options %v", vm.state.stack, vm.state.options)
+			log.Printf("stack %v; options %v", vm.state.stack, vm.state.options)
 			log.Printf("% 15s %06d %s", vm.state.node.Name, vm.state.pc, FormatInstruction(inst))
 		}
 		err := vm.execute(inst)
@@ -197,7 +197,6 @@ func (vm *VirtualMachine) execRunLine(operands []*yarnpb.Operand) error {
 	if len(operands) > 1 {
 		// Second operand gives number of values on stack to include as
 		// substitutions.
-		// NB: the bytecode only has floats, no ints.
 		n, err := operandToInt(operands[1])
 		if err != nil {
 			return fmt.Errorf("operandToInt(opB): %w", err)
@@ -222,7 +221,6 @@ func (vm *VirtualMachine) execRunCommand(operands []*yarnpb.Operand) error {
 	if len(operands) > 1 {
 		// Second operand gives number of values on stack to interpolate
 		// into the command as substitutions.
-		// NB: the bytecode only has floats, no ints.
 		n, err := operandToInt(operands[1])
 		if err != nil {
 			return fmt.Errorf("operandToInt(opB): %w", err)
@@ -235,7 +233,7 @@ func (vm *VirtualMachine) execRunCommand(operands []*yarnpb.Operand) error {
 			cmd = strings.Replace(cmd, fmt.Sprintf("{%d}", i), s, -1)
 		}
 	}
-	// Just because the command could affect PC, increment first
+	// To allow the command to overwrite PC, increment it first
 	vm.state.pc++
 	if err := vm.Handler.Command(cmd); err != nil {
 		return fmt.Errorf("handler.Command: %w", err)
@@ -354,6 +352,7 @@ func (vm *VirtualMachine) execJumpIfFalse(operands []*yarnpb.Operand) error {
 	}
 	if b {
 		// Value is true, so don't jump
+		vm.state.pc++
 		return nil
 	}
 	k := operands[0].GetStringValue()
@@ -438,10 +437,8 @@ func (vm *VirtualMachine) execCallFunc(operands []*yarnpb.Operand) error {
 	result := reflect.ValueOf(f).Call(params)
 
 	// Error?
-	if last := ft.NumOut() - 1; len(result) > 0 && ft.Out(last) == errorType {
-		if err := result[1].Interface().(error); err != nil {
-			return err
-		}
+	if last := ft.NumOut() - 1; last >= 0 && ft.Out(last) == errorType && !result[last].IsNil() {
+		return result[last].Interface().(error)
 	}
 
 	// A return value?
@@ -458,6 +455,7 @@ func (vm *VirtualMachine) execPushVariable(operands []*yarnpb.Operand) error {
 	v, ok := vm.Vars.GetValue(k)
 	if ok {
 		vm.state.push(v)
+		vm.state.pc++
 		return nil
 	}
 	// Is it provided as an initial value?

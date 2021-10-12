@@ -15,13 +15,13 @@
 package yarn
 
 import (
+	"errors"
 	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	yarnpb "github.com/DrJosh9000/yarn/bytecode"
 	"google.golang.org/protobuf/proto"
@@ -73,25 +73,24 @@ func TestAllTestPlans(t *testing.T) {
 			}
 
 			vm := &VirtualMachine{
-				Program:  &prog,
-				Handler:  testplan,
-				Vars:     make(MapVariableStorage),
+				Program: &prog,
+				Handler: testplan,
+				Vars:    make(MapVariableStorage),
+				FuncMap: FuncMap{
+					"assert": func(x bool) error {
+						if !x {
+							return errors.New("assertion failed")
+						}
+						return nil
+					},
+				},
 				TraceLog: traceOutput,
 			}
 			testplan.StringTable = st
 			testplan.VirtualMachine = vm
 
-			done := make(chan struct{})
-			go func() {
-				if err := vm.Run("Start"); err != nil {
-					t.Errorf("vm.Run() = %v", err)
-				}
-				close(done)
-			}()
-			select {
-			case <-time.After(100 * time.Millisecond):
-				t.Errorf("timeout after 100ms")
-			case <-done:
+			if err := vm.Run("Start"); err != nil {
+				t.Errorf("vm.Run() = %v", err)
 			}
 			if err := testplan.Complete(); err != nil {
 				t.Errorf("testplan incomplete: %v", err)
