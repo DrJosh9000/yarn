@@ -18,7 +18,10 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	yarnpb "github.com/DrJosh9000/yarn/bytecode"
 	"google.golang.org/protobuf/proto"
@@ -26,58 +29,73 @@ import (
 
 const traceOutput = false
 
-func TestVMExample(t *testing.T) {
-	tpf, err := os.Open("testdata/Example.testplan")
+func TestAllTestPlans(t *testing.T) {
+	testplans, err := filepath.Glob("testdata/*.testplan")
 	if err != nil {
-		t.Fatalf("Open: %v", err)
-	}
-	defer tpf.Close()
-	testplan, err := ReadTestPlan(tpf)
-	if err != nil {
-		t.Fatalf("ReadTestPlan: %v", err)
+		t.Fatalf("Glob: %v", err)
 	}
 
-	yarnc, err := ioutil.ReadFile("testdata/Example.yarn.yarnc")
-	if err != nil {
-		t.Fatalf("ReadFile: %v", err)
-	}
-	var prog yarnpb.Program
-	if err := proto.Unmarshal(yarnc, &prog); err != nil {
-		t.Fatalf("proto.Unmarshal: %v", err)
-	}
+	for _, tpn := range testplans {
+		t.Run(tpn, func(t *testing.T) {
+			tpf, err := os.Open(tpn)
+			if err != nil {
+				t.Fatalf("Open: %v", err)
+			}
+			defer tpf.Close()
+			testplan, err := ReadTestPlan(tpf)
+			if err != nil {
+				t.Fatalf("ReadTestPlan: %v", err)
+			}
 
-	csv, err := os.Open("testdata/Example.yarn.csv")
-	if err != nil {
-		t.Fatalf("Open: %v", err)
-	}
-	defer csv.Close()
-	st, err := ReadStringTable(csv)
-	if err != nil {
-		t.Fatalf("ReadStringTable: %v", err)
-	}
+			base := strings.TrimSuffix(filepath.Base(tpn), ".testplan")
 
-	if traceOutput {
-		log.Print(FormatProgram(&prog))
-	}
+			yarnc, err := ioutil.ReadFile("testdata/" + base + ".yarn.yarnc")
+			if err != nil {
+				t.Fatalf("ReadFile: %v", err)
+			}
+			var prog yarnpb.Program
+			if err := proto.Unmarshal(yarnc, &prog); err != nil {
+				t.Fatalf("proto.Unmarshal: %v", err)
+			}
 
-	vm := &VirtualMachine{
-		Program:  &prog,
-		Handler:  testplan,
-		Vars:     make(MapVariableStorage),
-		TraceLog: traceOutput,
-	}
-	testplan.StringTable = st
-	testplan.VirtualMachine = vm
+			csv, err := os.Open("testdata/" + base + ".yarn.csv")
+			if err != nil {
+				t.Fatalf("Open: %v", err)
+			}
+			defer csv.Close()
+			st, err := ReadStringTable(csv)
+			if err != nil {
+				t.Fatalf("ReadStringTable: %v", err)
+			}
 
-	done := make(chan struct{})
-	go func() {
-		if err := vm.Run("Start"); err != nil {
-			t.Errorf("vm.Run() = %v", err)
-		}
-		close(done)
-	}()
-	<-done
-	if err := testplan.Complete(); err != nil {
-		t.Errorf("testplan incomplete: %v", err)
+			if traceOutput {
+				log.Print(FormatProgram(&prog))
+			}
+
+			vm := &VirtualMachine{
+				Program:  &prog,
+				Handler:  testplan,
+				Vars:     make(MapVariableStorage),
+				TraceLog: traceOutput,
+			}
+			testplan.StringTable = st
+			testplan.VirtualMachine = vm
+
+			done := make(chan struct{})
+			go func() {
+				if err := vm.Run("Start"); err != nil {
+					t.Errorf("vm.Run() = %v", err)
+				}
+				close(done)
+			}()
+			select {
+			case <-time.After(100 * time.Millisecond):
+				t.Errorf("timeout after 100ms")
+			case <-done:
+			}
+			if err := testplan.Complete(); err != nil {
+				t.Errorf("testplan incomplete: %v", err)
+			}
+		})
 	}
 }

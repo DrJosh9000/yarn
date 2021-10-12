@@ -45,8 +45,9 @@ func ReadTestPlan(r io.Reader) (*TestPlan, error) {
 	var tp TestPlan
 	sc := bufio.NewScanner(r)
 	for sc.Scan() {
-		txt := sc.Text()
-		if strings.HasPrefix(txt, "#") {
+		txt := strings.TrimSpace(sc.Text())
+		if txt == "" || strings.HasPrefix(txt, "#") {
+			// Skip blanks and comments
 			continue
 		}
 		tok := strings.SplitN(txt, ":", 2)
@@ -77,6 +78,9 @@ func (p *TestPlan) Complete() error {
 
 // Line checks that the line matches the one expected by the plan.
 func (p *TestPlan) Line(line Line) error {
+	if p.Step >= len(p.Steps) {
+		return errors.New("next testplan step after end")
+	}
 	step := p.Steps[p.Step]
 	if step.Type != "line" {
 		return fmt.Errorf("testplan got line, want %q", step.Type)
@@ -95,6 +99,9 @@ func (p *TestPlan) Line(line Line) error {
 // Options checks that the options match those expected by the plan, then
 // selects the option specified in the plan.
 func (p *TestPlan) Options(opts []Option) (int, error) {
+	if p.Step >= len(p.Steps) {
+		return 0, errors.New("next testplan step after end")
+	}
 	for _, opt := range opts {
 		step := p.Steps[p.Step]
 		if step.Type != "option" {
@@ -129,7 +136,9 @@ func (p *TestPlan) Command(command string) error {
 		// This is basically RUN_NODE...
 		return p.VirtualMachine.SetNode(strings.TrimPrefix(command, "jump "))
 	}
-
+	if p.Step >= len(p.Steps) {
+		return errors.New("next testplan step after end")
+	}
 	step := p.Steps[p.Step]
 	if step.Type != "command" {
 		return fmt.Errorf("testplan got command, want %q", step.Type)
@@ -145,11 +154,11 @@ func (p *TestPlan) DialogueComplete() error {
 	return nil
 }
 
-// NodeStart does nothing.
+// NodeStart does nothing and returns nil.
 func (p *TestPlan) NodeStart(string) error { return nil }
 
-// NodeComplete does nothing.
+// NodeComplete does nothing and returns nil.
 func (p *TestPlan) NodeComplete(string) error { return nil }
 
-// PrepareForLines does nothing.
+// PrepareForLines does nothing and returns nil.
 func (p *TestPlan) PrepareForLines([]string) error { return nil }
