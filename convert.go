@@ -45,6 +45,8 @@ func convertToBool(x interface{}) (bool, error) {
 	}
 }
 
+// convertToInt attempts conversion of an arbitrary value to int. Right now it's
+// only used by the VM to count function arguments.
 func convertToInt(x interface{}) (int, error) {
 	if x == nil {
 		return 0, nil
@@ -71,12 +73,13 @@ func convertToInt(x interface{}) (int, error) {
 	}
 }
 
+// convertToString converts a value to a string, in a way that matches what Yarn
+// Spinner does. nil becomes "null", and booleans are title-cased.
 func convertToString(x interface{}) string {
 	if x == nil {
 		return "null"
 	}
-	switch x := x.(type) {
-	case bool:
+	if x, ok := x.(bool); ok {
 		if x {
 			return "True"
 		}
@@ -85,6 +88,7 @@ func convertToString(x interface{}) string {
 	return fmt.Sprint(x)
 }
 
+// operandToInt is a helper for turning a number value into an int.
 func operandToInt(op *yarnpb.Operand) (int, error) {
 	if op == nil {
 		return 0, errors.New("nil operand")
