@@ -96,12 +96,8 @@ func (p *TestPlan) Line(line Line) error {
 	if !found {
 		return fmt.Errorf("no string %q in string table", line.ID)
 	}
-	text, err := Unescape(row.Text)
-	if err != nil {
-		return fmt.Errorf("unescaping row text: %w", err)
-	}
-	if text != step.Contents {
-		return fmt.Errorf("testplan got line %q, want %q", text, step.Contents)
+	if row.Text != step.Contents {
+		return fmt.Errorf("testplan got line %q, want %q", row.Text, step.Contents)
 	}
 	return nil
 }
@@ -122,11 +118,7 @@ func (p *TestPlan) Options(opts []Option) (int, error) {
 		if !found {
 			return 0, fmt.Errorf("no string %q in string table", opt.Line.ID)
 		}
-		text, err := Unescape(row.Text)
-		if err != nil {
-			return 0, fmt.Errorf("unescaping row text: %w", err)
-		}
-		if text != step.Contents {
+		if row.Text != step.Contents {
 			return 0, fmt.Errorf("testplan got line %q, want %q", row.Text, step.Contents)
 		}
 	}
@@ -148,18 +140,12 @@ func (p *TestPlan) Options(opts []Option) (int, error) {
 
 // Command handles the command... somehow.
 func (p *TestPlan) Command(command string) error {
-	// Handle v2 "commands" compiled by the v1 compiler.
+	// Handle "commands" that should be compiled differently ?
 	if strings.HasPrefix(command, "jump ") {
 		// v2 should compile this as RUN_NODE, I guess?
 		return p.VirtualMachine.SetNode(strings.TrimPrefix(command, "jump "))
 	}
-	if strings.HasPrefix(command, "declare ") {
-		// v2 compiler uses this for variable type info and initial value.
-		// So we need to set a variable in VariableStorage.
-		return p.declare(strings.TrimPrefix(command, "declare "))
-	}
 
-	// TODO: how are commands handled in real yarnspinner's testplan?
 	if p.Step >= len(p.Steps) {
 		return errors.New("next testplan step after end")
 	}
@@ -186,69 +172,3 @@ func (p *TestPlan) NodeComplete(string) error { return nil }
 
 // PrepareForLines does nothing and returns nil.
 func (p *TestPlan) PrepareForLines([]string) error { return nil }
-
-// "declare" as a command
-func (p *TestPlan) declare(cmd string) error {
-	tokens := strings.Split(cmd, " ")
-	switch len(tokens) {
-	case 3: // $var = value
-		if tokens[1] != "=" {
-			return fmt.Errorf("malformed declare statement [tokens[1] = %q != '=']", tokens[1])
-		}
-		switch {
-		case tokens[2] == "false":
-			p.VirtualMachine.Vars.SetValue(tokens[0], false)
-		case tokens[2] == "true":
-			p.VirtualMachine.Vars.SetValue(tokens[0], true)
-		case strings.HasPrefix(tokens[2], `"`) && strings.HasSuffix(tokens[2], `"`):
-			s, err := strconv.Unquote(tokens[2])
-			if err != nil {
-				return err
-			}
-			p.VirtualMachine.Vars.SetValue(tokens[0], s)
-		default:
-			// assume number
-			n, err := strconv.ParseFloat(tokens[2], 32)
-			if err != nil {
-				return err
-			}
-			p.VirtualMachine.Vars.SetValue(tokens[0], float32(n))
-		}
-		return nil
-	case 5: // $var = value as type
-		if tokens[1] != "=" {
-			return fmt.Errorf(`malformed declare statement [tokens[1] = %q != "="]`, tokens[1])
-		}
-		if tokens[3] != "as" {
-			return fmt.Errorf(`malformed declare statement [tokens[1] = %q != "as"]`, tokens[3])
-		}
-		switch tokens[4] {
-		case "bool":
-			switch tokens[2] {
-			case "false":
-				p.VirtualMachine.Vars.SetValue(tokens[0], false)
-			case "true":
-				p.VirtualMachine.Vars.SetValue(tokens[0], true)
-			default:
-				return fmt.Errorf("type mismatch [tokens[2] = %q but tokens[4] = %q]", tokens[2], tokens[4])
-			}
-		case "number":
-			n, err := strconv.ParseFloat(tokens[2], 32)
-			if err != nil {
-				return err
-			}
-			p.VirtualMachine.Vars.SetValue(tokens[0], float32(n))
-		case "string":
-			s, err := strconv.Unquote(tokens[2])
-			if err != nil {
-				return err
-			}
-			p.VirtualMachine.Vars.SetValue(tokens[0], s)
-		default:
-			return fmt.Errorf("malformed declare statement [tokens[4] = %q ∉ {bool,number,string}]", tokens[4])
-		}
-		return nil
-	default:
-		return fmt.Errorf("malformed declare statement [len(tokens) %d ∉ {3,5}]", len(tokens))
-	}
-}
