@@ -40,10 +40,10 @@ func defaultFuncMap() FuncMap {
 		"LessThan":             func(x, y float32) bool { return x < y },
 		"LessThanOrEqualTo":    func(x, y float32) bool { return x <= y },
 		"NotEqualTo":           func(x, y interface{}) bool { return x != y },
-		"Or":                   func(x, y bool) bool { return x || y },
-		"And":                  func(x, y bool) bool { return x && y },
-		"Xor":                  func(x, y bool) bool { return x != y },
-		"Not":                  func(x bool) bool { return !x },
+		"Or":                   funcOr,
+		"And":                  funcAnd,
+		"Xor":                  funcXor,
+		"Not":                  funcNot,
 		"UnaryMinus":           func(x float32) float32 { return -x },
 		"Add":                  funcAdd,
 		"Minus":                func(x, y float32) float32 { return x - y },
@@ -53,20 +53,66 @@ func defaultFuncMap() FuncMap {
 	}
 }
 
+func funcOr(x, y interface{}) (bool, error) {
+	xt, err := convertToBool(x)
+	if err != nil {
+		return false, fmt.Errorf("first arg: %w", err)
+	}
+	yt, err := convertToBool(x)
+	if err != nil {
+		return false, fmt.Errorf("second arg: %w", err)
+	}
+	return xt || yt, nil
+}
+
+func funcAnd(x, y interface{}) (bool, error) {
+	xt, err := convertToBool(x)
+	if err != nil {
+		return false, fmt.Errorf("first arg: %w", err)
+	}
+	yt, err := convertToBool(x)
+	if err != nil {
+		return false, fmt.Errorf("second arg: %w", err)
+	}
+	return xt && yt, nil
+}
+
+func funcXor(x, y interface{}) (bool, error) {
+	xt, err := convertToBool(x)
+	if err != nil {
+		return false, fmt.Errorf("first arg: %w", err)
+	}
+	yt, err := convertToBool(x)
+	if err != nil {
+		return false, fmt.Errorf("second arg: %w", err)
+	}
+	return xt != yt, nil
+}
+
+func funcNot(x interface{}) (bool, error) {
+	t, err := convertToBool(x)
+	return !t, err
+}
+
 func funcAdd(x, y interface{}) (interface{}, error) {
+	if x == nil {
+		return y, nil
+	}
 	switch xt := x.(type) {
 	case string:
-		yt, ok := y.(string)
-		if !ok {
-			return false, fmt.Errorf("mismatching types [%T != string]", y)
-		}
-		return xt + yt, nil
+		return xt + convertToString(y), nil
 	case float32:
-		yt, ok := y.(float32)
-		if !ok {
-			return false, fmt.Errorf("mismatching types [%T != float32]", y)
+		if y == nil {
+			return x, nil
 		}
-		return xt + yt, nil
+		switch yt := y.(type) {
+		case float32:
+			return xt + yt, nil
+		case string:
+			return convertToString(x) + yt, nil
+		default:
+			return nil, fmt.Errorf("mismatching types [first arg float32, second arg %T]", y)
+		}
 	}
-	return false, fmt.Errorf("unsupported type [%T ∉ {float32,string}]", x)
+	return false, fmt.Errorf("unsupported type [%T ∉ {nil,float32,string}]", x)
 }

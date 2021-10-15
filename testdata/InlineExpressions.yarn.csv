@@ -1,0 +1,20 @@
+id,text,file,node,lineNumber
+InlineExpressions-Start-0,Number: {0},InlineExpressions,Start,9
+InlineExpressions-Start-1,Expression: {0},InlineExpressions,Start,10
+InlineExpressions-Start-2,String: {0},InlineExpressions,Start,11
+InlineExpressions-Start-3,Bool: {0},InlineExpressions,Start,12
+InlineExpressions-Start-4,Null: {0},InlineExpressions,Start,13
+InlineExpressions-Start-5,Variable: {0},InlineExpressions,Start,14
+InlineExpressions-Start-6,{0} is great!,InlineExpressions,Start,17
+InlineExpressions-Start-7,Shortcut Number: {0},InlineExpressions,Start,20
+InlineExpressions-Start-8,Shortcut Expression: {0},InlineExpressions,Start,21
+InlineExpressions-Start-9,Shortcut String: {0},InlineExpressions,Start,22
+InlineExpressions-Start-10,Shortcut Bool: {0},InlineExpressions,Start,23
+InlineExpressions-Start-11,Shortcut Null: {0},InlineExpressions,Start,24
+InlineExpressions-Start-12,Shortcut Variable: {0},InlineExpressions,Start,25
+InlineExpressions-Start-13,Regular Number: {0},InlineExpressions,Start,36
+InlineExpressions-Start-14,Regular Expression: {0},InlineExpressions,Start,37
+InlineExpressions-Start-15,Regular String: {0},InlineExpressions,Start,38
+InlineExpressions-Start-16,Regular Bool: {0},InlineExpressions,Start,39
+InlineExpressions-Start-17,Regular Null: {0},InlineExpressions,Start,40
+InlineExpressions-Start-18,Regular Variable: {0},InlineExpressions,Start,41

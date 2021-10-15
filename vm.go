@@ -382,67 +382,89 @@ func (vm *VirtualMachine) execCallFunc(operands []*yarnpb.Operand) error {
 
 	// TODO: typecheck FuncMap during preprocessing
 	// TODO: a lot of this is very forgiving...
-	k := operands[0].GetStringValue()
-	f, found := vm.FuncMap[k]
+	funcname := operands[0].GetStringValue()
+	function, found := vm.FuncMap[funcname]
 	if !found {
-		return fmt.Errorf("function %q not found", k)
+		return fmt.Errorf("function %q not found", funcname)
 	}
-	ft := reflect.TypeOf(f)
-	if ft.Kind() != reflect.Func {
-		return fmt.Errorf("function %q not actually a function [type %T]", k, f)
+	functype := reflect.TypeOf(function)
+	if functype.Kind() != reflect.Func {
+		return fmt.Errorf("function %q not actually a function [type %T]", funcname, function)
 	}
 	// Compiler puts number of args on top of stack
 	gotx, err := vm.state.pop()
 	if err != nil {
 		return fmt.Errorf("pop: %w", err)
 	}
-	got, err := convertToInt(gotx)
+	gotArgc, err := convertToInt(gotx)
 	if err != nil {
 		return fmt.Errorf("convertToInt: %w", err)
 	}
 	// Check that we have enough args to call the func
-	switch want := ft.NumIn(); {
-	case ft.IsVariadic() && got < want-1:
-		// The last (variadic) arg is free to be empty.
-		return fmt.Errorf("insufficient args [%d < %d]", got, want)
-	case !ft.IsVariadic() && got != want:
-		return fmt.Errorf("wrong number of args [%d != %d]", got, want)
+	switch wantArgc := functype.NumIn(); {
+	case functype.IsVariadic() && gotArgc < wantArgc-1:
+		// The last (variadic) arg is free to be empty. But we don't even have
+		// that many...
+		return fmt.Errorf("insufficient args provided by program [got %d < want %d]", gotArgc, wantArgc-1)
+	case !functype.IsVariadic() && gotArgc != wantArgc:
+		// Gotta match exactly.
+		return fmt.Errorf("wrong number of args provided by program [got %d, want %d]", gotArgc, wantArgc)
 	}
 
-	// Also check that f either returns {0,1,2} values; the second is
-	// only allowed to be type error.
-	switch {
-	case ft.NumOut() == 2 && ft.Out(1) == errorType:
+	// Also check that function returns between 0 and 2 args; if there are two,
+	// the second is only allowed to be type error.
+	switch functype.NumOut() {
+	case 0, 1:
 		// ok
-	case ft.NumOut() < 2:
-		// ok
+	case 2:
+		if functype.Out(1) != errorType {
+			return fmt.Errorf("wrong type for second return arg [got %s, want error]", functype.Out(1).Name())
+		}
 	default:
-		// TODO: elaborate in message
-		return errors.New("wrong number or type of return args")
+		return fmt.Errorf("unsupported number of return args [got %d, want in {0,1,2}]", functype.NumOut())
 	}
 
-	params := make([]reflect.Value, got)
-	for got > 0 {
-		got--
-		p, err := vm.state.pop()
+	arg := gotArgc
+	params := make([]reflect.Value, arg)
+	for arg > 0 {
+		arg--
+		param, err := vm.state.pop()
 		if err != nil {
 			return fmt.Errorf("pop: %w", err)
 		}
-		params[got] = reflect.ValueOf(p)
+		var argtype reflect.Type
+		if functype.IsVariadic() && arg >= functype.NumIn()-1 {
+			// last arg is reported by reflect as a slice type
+			argtype = functype.In(functype.NumIn() - 1).Elem()
+		} else {
+			// Not variadic
+			argtype = functype.In(arg)
+		}
+		if param == nil {
+			// substitute param with a zero value
+			params[arg] = reflect.Zero(argtype)
+			continue
+		}
+
+		// typecheck paramtype against argtype
+		if paramtype := reflect.TypeOf(param); !paramtype.AssignableTo(argtype) {
+			return fmt.Errorf("value %v [type %T] not assignable to argument %d of %q [type %v]", param, param, arg, funcname, argtype)
+		}
+		params[arg] = reflect.ValueOf(param)
 	}
 
 	// Because the func could overwrite PC, increment first
 	vm.state.pc++
 
-	result := reflect.ValueOf(f).Call(params)
+	result := reflect.ValueOf(function).Call(params)
 
 	// Error?
-	if last := ft.NumOut() - 1; last >= 0 && ft.Out(last) == errorType && !result[last].IsNil() {
+	if last := functype.NumOut() - 1; last >= 0 && functype.Out(last) == errorType && !result[last].IsNil() {
 		return result[last].Interface().(error)
 	}
 
 	// A return value?
-	if len(result) > 0 && ft.Out(0) != errorType {
+	if len(result) > 0 && functype.Out(0) != errorType {
 		vm.state.push(result[0].Interface())
 	}
 	return nil
@@ -461,7 +483,11 @@ func (vm *VirtualMachine) execPushVariable(operands []*yarnpb.Operand) error {
 	// Is it provided as an initial value?
 	w, ok := vm.Program.InitialValues[k]
 	if !ok {
-		return fmt.Errorf("no variable %q in storage or initial values", k)
+		// Neither a known nor initial value.
+		// Yarn Spinner pushes null.
+		vm.state.push(nil)
+		vm.state.pc++
+		return nil
 	}
 	switch x := w.Value.(type) {
 	case *yarnpb.Operand_BoolValue:

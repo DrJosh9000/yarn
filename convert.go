@@ -22,24 +22,26 @@ import (
 	yarnpb "github.com/DrJosh9000/yarn/bytecode"
 )
 
+// convertToBool attempts conversion of the standard Yarn Spinner VM types
+// (bool, number, string, null) to bool. This is needed because values are
+// truthy.
 func convertToBool(x interface{}) (bool, error) {
 	if x == nil {
 		return false, nil
 	}
-	switch t := x.(type) {
+	switch x := x.(type) {
 	case bool:
-		return t, nil
+		return x, nil
+	case float32:
+		return x != 0, nil
 	case float64:
-		return t != 0, nil
+		return x != 0, nil
 	case int:
-		return t != 0, nil
+		return x != 0, nil
 	case string:
-		return len(t) > 0, nil
+		return strconv.ParseBool(x)
 	default:
-		if t == nil {
-			return false, nil
-		}
-		return false, fmt.Errorf("cannot convert value of type %T to a bool", x)
+		return false, fmt.Errorf("cannot convert value of type %T to bool", x)
 	}
 }
 
@@ -67,6 +69,13 @@ func convertToInt(x interface{}) (int, error) {
 		}
 		return 0, fmt.Errorf("cannot convert value of type %T to int", x)
 	}
+}
+
+func convertToString(x interface{}) string {
+	if x == nil {
+		return ""
+	}
+	return fmt.Sprint(x)
 }
 
 func operandToInt(op *yarnpb.Operand) (int, error) {

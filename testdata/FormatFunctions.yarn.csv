@@ -1,0 +1,20 @@
+id,text,file,node,lineNumber
+FormatFunctions-Start-0,"Select: [select ""{0}"" male=""male"" female=""female"" other=""other""]",FormatFunctions,Start,6
+FormatFunctions-Start-1,"Select: [select ""{0}"" male=""male"" female=""female"" other=""other""]",FormatFunctions,Start,9
+FormatFunctions-Start-2,"Select: [select ""{0}"" male=""male"" female=""female"" other=""other""]",FormatFunctions,Start,12
+FormatFunctions-Start-3,"Plural: [plural ""{0}"" one=""one"" two=""two"" few=""few"" many=""many"" other=""other""]",FormatFunctions,Start,16
+FormatFunctions-Start-4,"Plural: [plural ""{0}"" one=""one"" two=""two"" few=""few"" many=""many"" other=""other""]",FormatFunctions,Start,19
+FormatFunctions-Start-5,"Plural: [plural ""{0}"" one=""one"" two=""two"" few=""few"" many=""many"" other=""other""]",FormatFunctions,Start,22
+FormatFunctions-Start-6,"Plural: [plural ""{0}"" one=""one"" two=""two"" few=""few"" many=""many"" other=""other""]",FormatFunctions,Start,25
+FormatFunctions-Start-7,"Ordinal: [ordinal ""{0}"" one=""one"" two=""two"" few=""few"" many=""many"" other=""other""]",FormatFunctions,Start,29
+FormatFunctions-Start-8,"Ordinal: [ordinal ""{0}"" one=""one"" two=""two"" few=""few"" many=""many"" other=""other""]",FormatFunctions,Start,32
+FormatFunctions-Start-9,"Ordinal: [ordinal ""{0}"" one=""one"" two=""two"" few=""few"" many=""many"" other=""other""]",FormatFunctions,Start,35
+FormatFunctions-Start-10,"Ordinal: [ordinal ""{0}"" one=""one"" two=""two"" few=""few"" many=""many"" other=""other""]",FormatFunctions,Start,38
+FormatFunctions-Start-11,"[select ""{0}"" male=""male: %"" female=""female: %"" other=""other: %""]",FormatFunctions,Start,45
+FormatFunctions-Start-12,"Mae: Wow, I came [ordinal ""{0}"" one=""%st"" two=""%nd"" few=""%rd"" other=""%th""]!",FormatFunctions,Start,48
+FormatFunctions-Start-13,"[select ""{0}"" male=""male"" female=""female"" other=""other""]",FormatFunctions,Start,52
+FormatFunctions-Start-14,"[plural ""{0}"" one=""one"" few=""few"" many=""many"" other=""other""]",FormatFunctions,Start,53
+FormatFunctions-Start-15,"[ordinal ""{0}"" one=""one"" two=""two"" few=""few"" many=""many"" other=""other""]",FormatFunctions,Start,54
+FormatFunctions-Start-16,"[select ""{0}"" male=""male"" female=""female"" other=""other""]",FormatFunctions,Start,57
+FormatFunctions-Start-17,"[plural ""{0}"" one=""one"" few=""few"" many=""many"" other=""other""]",FormatFunctions,Start,58
+FormatFunctions-Start-18,"[ordinal ""{0}"" one=""one"" few=""few"" many=""many"" other=""other""]",FormatFunctions,Start,59

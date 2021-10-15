@@ -72,7 +72,7 @@ func ReadStringTable(r io.Reader) (StringTable, error) {
 func Unescape(s string) (string, error) {
 	var b strings.Builder
 	for s != "" {
-		r, _, t, err := strconv.UnquoteChar(s, '"')
+		r, _, t, err := strconv.UnquoteChar(s, 0)
 		if err != nil {
 			return "", err
 		}

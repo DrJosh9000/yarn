@@ -78,8 +78,12 @@ func TestAllTestPlans(t *testing.T) {
 				Vars:    make(MapVariableStorage),
 				FuncMap: FuncMap{
 					// Used by various
-					"assert": func(x bool) error {
-						if !x {
+					"assert": func(x interface{}) error {
+						t, err := convertToBool(x)
+						if err != nil {
+							return err
+						}
+						if !t {
 							return errors.New("assertion failed")
 						}
 						return nil
@@ -88,6 +92,12 @@ func TestAllTestPlans(t *testing.T) {
 					// TODO: use ints like the real YarnSpinner
 					"add_three_operands": func(x, y, z float32) float32 {
 						return x + y + z
+					},
+					"last_value": func(x ...interface{}) (interface{}, error) {
+						if len(x) == 0 {
+							return nil, errors.New("no args")
+						}
+						return x[len(x)-1], nil
 					},
 				},
 				TraceLog: traceOutput,
