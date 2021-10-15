@@ -38,16 +38,14 @@ func ReadStringTable(r io.Reader) (StringTable, error) {
 	st := make(StringTable)
 	header := true
 	cr := csv.NewReader(r)
+	cr.FieldsPerRecord = 5
 	for {
 		rec, err := cr.Read()
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return nil, fmt.Errorf("csv read: %v", err)
+		if err == io.EOF {
+			break
 		}
-		if len(rec) != 5 {
-			return nil, fmt.Errorf("bad record size [%d != 5]", len(rec))
+		if err != nil {
+			return nil, fmt.Errorf("csv read: %v", err)
 		}
 		if header {
 			header = false
