@@ -40,16 +40,17 @@ func defaultFuncMap() FuncMap {
 		"LessThan":             func(x, y float32) bool { return x < y },
 		"LessThanOrEqualTo":    func(x, y float32) bool { return x <= y },
 		"NotEqualTo":           func(x, y interface{}) bool { return x != y },
-		"Or":                   funcOr,
-		"And":                  funcAnd,
-		"Xor":                  funcXor,
-		"Not":                  funcNot,
-		"UnaryMinus":           func(x float32) float32 { return -x },
-		"Add":                  funcAdd,
-		"Minus":                func(x, y float32) float32 { return x - y },
-		"Multiply":             func(x, y float32) float32 { return x * y },
-		"Divide":               func(x, y float32) float32 { return x / y },
-		"Modulo":               func(x, y float32) float32 { return float32(int(x) % int(y)) },
+		// numbers are truthy, hence boolean operators are generic
+		"Or":         funcOr,
+		"And":        funcAnd,
+		"Xor":        funcXor,
+		"Not":        funcNot,
+		"UnaryMinus": func(x float32) float32 { return -x },
+		"Add":        funcAdd,
+		"Minus":      func(x, y float32) float32 { return x - y },
+		"Multiply":   func(x, y float32) float32 { return x * y },
+		"Divide":     func(x, y float32) float32 { return x / y },
+		"Modulo":     func(x, y float32) float32 { return float32(int(x) % int(y)) },
 	}
 }
 
@@ -98,13 +99,13 @@ func funcAdd(x, y interface{}) (interface{}, error) {
 	if x == nil {
 		return y, nil
 	}
+	if y == nil {
+		return x, nil
+	}
 	switch xt := x.(type) {
 	case string:
 		return xt + convertToString(y), nil
 	case float32:
-		if y == nil {
-			return x, nil
-		}
 		switch yt := y.(type) {
 		case float32:
 			return xt + yt, nil

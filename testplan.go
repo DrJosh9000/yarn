@@ -96,8 +96,12 @@ func (p *TestPlan) Line(line Line) error {
 	if !found {
 		return fmt.Errorf("no string %q in string table", line.ID)
 	}
-	if row.Text != step.Contents {
-		return fmt.Errorf("testplan got line %q, want %q", row.Text, step.Contents)
+	text := row.Text
+	for i, s := range line.Substitutions {
+		text = strings.ReplaceAll(text, fmt.Sprintf("{%d}", i), s)
+	}
+	if text != step.Contents {
+		return fmt.Errorf("testplan got line %q, want %q", text, step.Contents)
 	}
 	return nil
 }
@@ -118,8 +122,12 @@ func (p *TestPlan) Options(opts []Option) (int, error) {
 		if !found {
 			return 0, fmt.Errorf("no string %q in string table", opt.Line.ID)
 		}
-		if row.Text != step.Contents {
-			return 0, fmt.Errorf("testplan got line %q, want %q", row.Text, step.Contents)
+		text := row.Text
+		for i, s := range opt.Line.Substitutions {
+			text = strings.ReplaceAll(text, fmt.Sprintf("{%d}", i), s)
+		}
+		if text != step.Contents {
+			return 0, fmt.Errorf("testplan got option line %q, want %q", text, step.Contents)
 		}
 	}
 	// Next step should be a select

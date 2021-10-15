@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"io"
 	"strconv"
-	"strings"
 )
 
 // StringTableRow contains all the information from one row in a string table.
@@ -65,19 +64,4 @@ func ReadStringTable(r io.Reader) (StringTable, error) {
 		}
 	}
 	return st, nil
-}
-
-// Unescape replaces escape sequences with their intended value.
-// TODO: check this does what real YarnSpinner does
-func Unescape(s string) (string, error) {
-	var b strings.Builder
-	for s != "" {
-		r, _, t, err := strconv.UnquoteChar(s, 0)
-		if err != nil {
-			return "", err
-		}
-		b.WriteRune(r)
-		s = t
-	}
-	return b.String(), nil
 }

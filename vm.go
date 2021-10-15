@@ -230,7 +230,7 @@ func (vm *VirtualMachine) execRunCommand(operands []*yarnpb.Operand) error {
 			return fmt.Errorf("popNStrings(%d): %w", n, err)
 		}
 		for i, s := range ss {
-			cmd = strings.Replace(cmd, fmt.Sprintf("{%d}", i), s, -1)
+			cmd = strings.ReplaceAll(cmd, fmt.Sprintf("{%d}", i), s)
 		}
 	}
 	// To allow the command to overwrite PC, increment it first
@@ -626,11 +626,7 @@ func (s *state) popNStrings(n int) ([]string, error) {
 	rem := len(s.stack) - n
 	ss := make([]string, n)
 	for i, x := range s.stack[rem:] {
-		t, ok := x.(string)
-		if !ok {
-			return nil, fmt.Errorf("%w from stack [%T != string]", ErrWrongType, x)
-		}
-		ss[i] = t
+		ss[i] = convertToString(x)
 	}
 	s.stack = s.stack[:rem]
 	return ss, nil

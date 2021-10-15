@@ -73,7 +73,14 @@ func convertToInt(x interface{}) (int, error) {
 
 func convertToString(x interface{}) string {
 	if x == nil {
-		return ""
+		return "null"
+	}
+	switch x := x.(type) {
+	case bool:
+		if x {
+			return "True"
+		}
+		return "False"
 	}
 	return fmt.Sprint(x)
 }
