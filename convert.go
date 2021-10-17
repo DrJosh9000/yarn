@@ -17,14 +17,15 @@ package yarn
 import (
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 
 	yarnpb "github.com/DrJosh9000/yarn/bytecode"
 )
 
 // convertToBool attempts conversion of the standard Yarn Spinner VM types
-// (bool, number, string, null) to bool. This is needed because values are
-// truthy.
+// (bool, number, string, null) to bool, in the same way Yarn Spinner does it
+// (see AsBool in Value.cs).
 func convertToBool(x interface{}) (bool, error) {
 	if x == nil {
 		return false, nil
@@ -33,20 +34,22 @@ func convertToBool(x interface{}) (bool, error) {
 	case bool:
 		return x, nil
 	case float32:
-		return x != 0, nil
+		return !math.IsNaN(float64(x)) && x != 0, nil
 	case float64:
-		return x != 0, nil
+		return !math.IsNaN(x) && x != 0, nil
 	case int:
 		return x != 0, nil
 	case string:
-		return strconv.ParseBool(x)
+		return x != "", nil
 	default:
 		return false, fmt.Errorf("cannot convert value of type %T to bool", x)
 	}
 }
 
 // convertToInt attempts conversion of an arbitrary value to int. Right now it's
-// only used by the VM to count function arguments.
+// only used by the VM to count function arguments. But it works in a way that
+// should be compatible with how Yarn Spinner does it (see AsNumber in
+// Value.cs).
 func convertToInt(x interface{}) (int, error) {
 	if x == nil {
 		return 0, nil
