@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 )
 
 // StringTableRow contains all the information from one row in a string table.
@@ -29,12 +30,15 @@ type StringTableRow struct {
 
 // StringTable contains all the information from a string table, keyed by
 // string ID.
-type StringTable map[string]StringTableRow
+type StringTable struct {
+	locale string
+	table  map[string]StringTableRow
+}
 
 // ReadStringTable reads a CSV-formatted string table from the reader. It
 // assumes the first row is a header.
-func ReadStringTable(r io.Reader) (StringTable, error) {
-	st := make(StringTable)
+func ReadStringTable(r io.Reader, locale string) (*StringTable, error) {
+	st := make(map[string]StringTableRow)
 	header := true
 	cr := csv.NewReader(r)
 	cr.FieldsPerRecord = 5
@@ -63,5 +67,24 @@ func ReadStringTable(r io.Reader) (StringTable, error) {
 			LineNumber: ln,
 		}
 	}
-	return st, nil
+	return &StringTable{
+		locale: locale,
+		table:  st,
+	}, nil
+}
+
+// Render looks up the row corresponding to line.ID, interpolates substitutions
+// (from line.Substitutions), and applies format functions.
+func (t *StringTable) Render(line Line) (string, error) {
+	row, found := t.table[line.ID]
+	if !found {
+		return "", fmt.Errorf("no string %q in string table", line.ID)
+	}
+	// Do substitutions
+	text := row.Text
+	for i, s := range line.Substitutions {
+		text = strings.ReplaceAll(text, fmt.Sprintf("{%d}", i), s)
+	}
+	// TODO: format functions
+	return text, nil
 }

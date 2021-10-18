@@ -38,7 +38,7 @@ type TestPlan struct {
 
 	DialogueCompleted bool
 
-	StringTable    StringTable
+	StringTable    *StringTable
 	VirtualMachine *VirtualMachine
 }
 
@@ -92,13 +92,9 @@ func (p *TestPlan) Line(line Line) error {
 		return fmt.Errorf("testplan got line, want %q", step.Type)
 	}
 	p.Step++
-	row, found := p.StringTable[line.ID]
-	if !found {
-		return fmt.Errorf("no string %q in string table", line.ID)
-	}
-	text := row.Text
-	for i, s := range line.Substitutions {
-		text = strings.ReplaceAll(text, fmt.Sprintf("{%d}", i), s)
+	text, err := p.StringTable.Render(line)
+	if err != nil {
+		return err
 	}
 	if text != step.Contents {
 		return fmt.Errorf("testplan got line %q, want %q", text, step.Contents)
@@ -118,13 +114,9 @@ func (p *TestPlan) Options(opts []Option) (int, error) {
 			return 0, fmt.Errorf("testplan got option, want %q", step.Type)
 		}
 		p.Step++
-		row, found := p.StringTable[opt.Line.ID]
-		if !found {
-			return 0, fmt.Errorf("no string %q in string table", opt.Line.ID)
-		}
-		text := row.Text
-		for i, s := range opt.Line.Substitutions {
-			text = strings.ReplaceAll(text, fmt.Sprintf("{%d}", i), s)
+		text, err := p.StringTable.Render(opt.Line)
+		if err != nil {
+			return 0, err
 		}
 		if text != step.Contents {
 			return 0, fmt.Errorf("testplan got option line %q, want %q", text, step.Contents)
