@@ -23,6 +23,7 @@ import (
 	"unicode"
 
 	"github.com/alecthomas/participle/v2"
+	"github.com/alecthomas/participle/v2/lexer"
 )
 
 // StringTableRow contains all the information from one row in a string table.
@@ -86,72 +87,175 @@ func (t *StringTable) Render(line Line) (string, error) {
 	return t.render(row.Text, line.Substitutions)
 }
 
-/*
-var _ = lexer.MustStateful(lexer.Rules{
-	"Root": {
-		// A line is a funny kind of string (no surrounding quotes, so quotes
-		// need not be escaped.)
-		{Name: "Escaped", Pattern: `\\[{}\[\]]`, Action: nil},
-		{Name: "Func", Pattern: `\[`, Action: lexer.Push("Func")},
-		{Name: "Subst", Pattern: `{`, Action: lexer.Push("Subst")},
-		{Name: "Char", Pattern: `[^{\[]+`, Action: nil},
-	},
-	"Func": {
-		{Name: "Whitespace", Pattern: `\s+`, Action: nil},
-		{Name: "String", Pattern: `"`, Action: lexer.Push("String")},
-		{Name: "Ident", Pattern: `\w+`, Action: nil},
-		{Name: "FuncEnd", Pattern: `\]`, Action: lexer.Pop()},
-	},
-	"Subst": {
-		{Name: "Index", Pattern: `\d+`, Action: nil},
-		{Name: "SubstEnd", Pattern: `}`, Action: lexer.Pop()},
-	},
-	"String": {
-		{Name: "Escaped", Pattern: `\\[{}\[\]"]`, Action: nil},
-		{Name: "Percent", Pattern: `%`, Action: nil},
-		{Name: "StringEnd", Pattern: `"`, Action: lexer.Pop()},
-		{Name: "Func", Pattern: `\[`, Action: lexer.Push("Func")},
-		{Name: "Subst", Pattern: `{`, Action: lexer.Push("Subst")},
-		{Name: "Char", Pattern: `[^{\[%]+`, Action: nil},
-	},
-})
+func (t *StringTable) render(text string, substs []string) (string, error) {
+	pl := new(parsedLine)
+	if err := lineParser.ParseString("", text, pl); err != nil {
+		return "", err
+	}
 
-type parsedLine struct {
-	Fragments []*lineFragment `parser:"@@*"`
+	var sb strings.Builder
+	if err := pl.assemble(&sb, substs); err != nil {
+		return "", err
+	}
+	return sb.String(), nil
 }
 
-type lineFragment struct {
-	Escaped string       `@Escaped`
-	Func    *parsedFunc  `| "[" @@ "]"`
-	Subst   *parsedSubst `| "{" @@ "}"`
-	Text    string       `| @Char`
+var (
+	lineLexer = lexer.MustStateful(lexer.Rules{
+		"Root": {
+			{Name: "Escaped", Pattern: `\\[{}\[\]"]`, Action: nil},
+			{Name: "Func", Pattern: `\[`, Action: lexer.Push("Func")},
+			{Name: "Subst", Pattern: `{`, Action: lexer.Push("Subst")},
+			{Name: "Char", Pattern: `%|[^{\[%"]+`, Action: nil},
+		},
+		"Func": {
+			{Name: "Whitespace", Pattern: `\s+`, Action: nil},
+			{Name: "Ident", Pattern: `\w+`, Action: nil},
+			{Name: "Equals", Pattern: `=`, Action: nil},
+			{Name: "String", Pattern: `"`, Action: lexer.Push("String")},
+			{Name: "FuncEnd", Pattern: `\]`, Action: lexer.Pop()},
+		},
+		"Subst": {
+			{Name: "Index", Pattern: `\d+`, Action: nil},
+			{Name: "SubstEnd", Pattern: `}`, Action: lexer.Pop()},
+		},
+		"String": {
+			lexer.Include("Root"),
+			{Name: "StringEnd", Pattern: `"`, Action: lexer.Pop()},
+		},
+	})
+
+	lineParser = participle.MustBuild(
+		&parsedLine{},
+		participle.Lexer(lineLexer),
+		participle.Elide("Whitespace"),
+	)
+)
+
+type parsedLine struct {
+	Fragments []*fragment `@@*`
+}
+
+func (p *parsedLine) assemble(sb *strings.Builder, substs []string) error {
+	for _, f := range p.Fragments {
+		if err := f.assemble(sb, substs); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type parsedFunc struct {
-	Name  string        `@Ident`
-	Input *parsedString `"\"" @@ "\""`
-	Opts  []*parsedOpt  `@@+`
+	Name  string       `@Ident`
+	Input *fragment    `"\"" @@ "\""`
+	Opts  []*parsedOpt `@@+`
 }
 
-type parsedString struct {
+func (f *parsedFunc) assemble(sb *strings.Builder, substs []string) error {
+	// input is a fragment that needs assembling
+	var inb strings.Builder
+	if err := f.Input.assemble(&inb, substs); err != nil {
+		return err
+	}
+	in := inb.String()
+
+	// function name determines lookup key
+	switch f.Name {
+	case "select":
+		// input chooses which value to interpolate
+		// (input == lookup key)
+		return f.findAndAssemble(sb, substs, in, in)
+
+	case "plural":
+		// TODO: use CLDR
+		if in == "1" {
+			return f.findAndAssemble(sb, substs, in, "one")
+		}
+		return f.findAndAssemble(sb, substs, in, "other")
+
+	case "ordinal":
+		// TODO: use CLDR
+		switch in {
+		case "1":
+			return f.findAndAssemble(sb, substs, in, "one")
+		case "2":
+			return f.findAndAssemble(sb, substs, in, "two")
+		case "3":
+			return f.findAndAssemble(sb, substs, in, "few")
+		default:
+			return f.findAndAssemble(sb, substs, in, "other")
+		}
+
+	default:
+		return fmt.Errorf("unknown format function %q", f.Name)
+	}
+}
+
+func (f *parsedFunc) findAndAssemble(sb *strings.Builder, substs []string, input, key string) error {
+	for _, opt := range f.Opts {
+		if opt.Key == key {
+			return opt.assemble(sb, substs, input)
+		}
+	}
+	return fmt.Errorf("key %q not found in %#v", key, f.Opts)
+}
+
+type fragment struct {
 	Escaped string       `@Escaped`
-	Percent string       `| @Percent`
 	Func    *parsedFunc  `| "[" @@ "]"`
 	Subst   *parsedSubst `| "{" @@ "}"`
 	Text    string       `| @Char`
+}
+
+func (s *fragment) assemble(sb *strings.Builder, substs []string) error {
+	if s == nil {
+		return nil
+	}
+	switch {
+	case s.Escaped != "":
+		sb.WriteString(s.Escaped[1:])
+	case s.Func != nil:
+		return s.Func.assemble(sb, substs)
+	case s.Subst != nil:
+		return s.Subst.assemble(sb, substs)
+	default:
+		sb.WriteString(s.Text)
+	}
+	return nil
 }
 
 type parsedSubst struct {
 	Index string `@Index`
 }
 
-type parsedOpt struct {
-	Key   string        `@Ident "="`
-	Value *parsedString `@@`
+func (s *parsedSubst) assemble(sb *strings.Builder, substs []string) error {
+	n, err := strconv.Atoi(s.Index)
+	if err != nil {
+		return err
+	}
+	sb.WriteString(substs[n])
+	return nil
 }
-*/
 
-func (t *StringTable) render(text string, substs []string) (string, error) {
+type parsedOpt struct {
+	Key   string      `@Ident "="`
+	Value []*fragment `"\"" @@* "\""`
+}
+
+func (o *parsedOpt) assemble(sb *strings.Builder, substs []string, input string) error {
+	for _, v := range o.Value {
+		if v.Text == "%" {
+			sb.WriteString(input)
+			continue
+		}
+		if err := v.assemble(sb, substs); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (t *StringTable) renderByHand(text string, substs []string) (string, error) {
 	// Do substitutions and format functions in one big stateful loop.
 	var sb strings.Builder
 
