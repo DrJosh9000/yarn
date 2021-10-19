@@ -132,7 +132,7 @@ var (
 )
 
 type parsedLine struct {
-	Fragments []*fragment `@@*`
+	Fragments []*fragment `parser:"@@*"`
 }
 
 func (p *parsedLine) assemble(sb *strings.Builder, substs []string) error {
@@ -145,9 +145,9 @@ func (p *parsedLine) assemble(sb *strings.Builder, substs []string) error {
 }
 
 type parsedFunc struct {
-	Name  string       `@Ident`
-	Input *fragment    `"\"" @@ "\""`
-	Opts  []*parsedOpt `@@+`
+	Name  string       `parser:"@Ident"`
+	Input *fragment    `parser:"\"\\\"\" @@ \"\\\"\""`
+	Opts  []*parsedOpt `parser:"@@+"`
 }
 
 func (f *parsedFunc) assemble(sb *strings.Builder, substs []string) error {
@@ -200,10 +200,10 @@ func (f *parsedFunc) findAndAssemble(sb *strings.Builder, substs []string, input
 }
 
 type fragment struct {
-	Escaped string       `@Escaped`
-	Func    *parsedFunc  `| "[" @@ "]"`
-	Subst   *parsedSubst `| "{" @@ "}"`
-	Text    string       `| @Char`
+	Escaped string       `parser:"@Escaped"`
+	Func    *parsedFunc  `parser:"| '[' @@ ']'"`
+	Subst   *parsedSubst `parser:"| '{' @@ '}'"`
+	Text    string       `parser:"| @Char"`
 }
 
 func (s *fragment) assemble(sb *strings.Builder, substs []string) error {
@@ -224,7 +224,7 @@ func (s *fragment) assemble(sb *strings.Builder, substs []string) error {
 }
 
 type parsedSubst struct {
-	Index string `@Index`
+	Index string `parser:"@Index"`
 }
 
 func (s *parsedSubst) assemble(sb *strings.Builder, substs []string) error {
@@ -232,13 +232,16 @@ func (s *parsedSubst) assemble(sb *strings.Builder, substs []string) error {
 	if err != nil {
 		return err
 	}
+	if n < 0 || n >= len(substs) {
+		return fmt.Errorf("substitution index %d out of range [0, %d)", n, len(substs))
+	}
 	sb.WriteString(substs[n])
 	return nil
 }
 
 type parsedOpt struct {
-	Key   string      `@Ident "="`
-	Value []*fragment `"\"" @@* "\""`
+	Key   string      `parser:"@Ident '='"`
+	Value []*fragment `parser:"\"\\\"\" @@* \"\\\"\""`
 }
 
 func (o *parsedOpt) assemble(sb *strings.Builder, substs []string, input string) error {
