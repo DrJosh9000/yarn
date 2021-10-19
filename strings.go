@@ -23,7 +23,6 @@ import (
 	"unicode"
 
 	"github.com/alecthomas/participle/v2"
-	"github.com/alecthomas/participle/v2/lexer"
 )
 
 // StringTableRow contains all the information from one row in a string table.
@@ -87,6 +86,7 @@ func (t *StringTable) Render(line Line) (string, error) {
 	return t.render(row.Text, line.Substitutions)
 }
 
+/*
 var _ = lexer.MustStateful(lexer.Rules{
 	"Root": {
 		// A line is a funny kind of string (no surrounding quotes, so quotes
@@ -149,6 +149,7 @@ type parsedOpt struct {
 	Key   string        `@Ident "="`
 	Value *parsedString `@@`
 }
+*/
 
 func (t *StringTable) render(text string, substs []string) (string, error) {
 	// Do substitutions and format functions in one big stateful loop.
@@ -326,7 +327,8 @@ func (f *fmtFunc) render(substs []string, langCode string) (string, error) {
 		// input chooses which value to interpolate
 		for _, kv := range f.Opts {
 			if kv.K == in {
-				return strconv.Unquote(kv.V)
+				out := strings.ReplaceAll(kv.V, "%", in)
+				return strconv.Unquote(out)
 			}
 		}
 		return "", fmt.Errorf("key %q not found in %v", in, f.Opts)
@@ -343,13 +345,15 @@ func (f *fmtFunc) render(substs []string, langCode string) (string, error) {
 		case 1:
 			for _, kv := range f.Opts {
 				if kv.K == "one" {
-					return strconv.Unquote(kv.V)
+					out := strings.ReplaceAll(kv.V, "%", in)
+					return strconv.Unquote(out)
 				}
 			}
 		default:
 			for _, kv := range f.Opts {
 				if kv.K == "other" {
-					return strconv.Unquote(kv.V)
+					out := strings.ReplaceAll(kv.V, "%", in)
+					return strconv.Unquote(out)
 				}
 			}
 		}
@@ -367,28 +371,32 @@ func (f *fmtFunc) render(substs []string, langCode string) (string, error) {
 		case 1:
 			for _, kv := range f.Opts {
 				if kv.K == "one" {
-					return strconv.Unquote(kv.V)
+					out := strings.ReplaceAll(kv.V, "%", in)
+					return strconv.Unquote(out)
 				}
 			}
 
 		case 2:
 			for _, kv := range f.Opts {
 				if kv.K == "two" {
-					return strconv.Unquote(kv.V)
+					out := strings.ReplaceAll(kv.V, "%", in)
+					return strconv.Unquote(out)
 				}
 			}
 
 		case 3:
 			for _, kv := range f.Opts {
 				if kv.K == "few" {
-					return strconv.Unquote(kv.V)
+					out := strings.ReplaceAll(kv.V, "%", in)
+					return strconv.Unquote(out)
 				}
 			}
 
 		default:
 			for _, kv := range f.Opts {
 				if kv.K == "other" {
-					return strconv.Unquote(kv.V)
+					out := strings.ReplaceAll(kv.V, "%", in)
+					return strconv.Unquote(out)
 				}
 			}
 		}
