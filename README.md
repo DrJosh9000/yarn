@@ -28,14 +28,15 @@ options, and commands to the handler.
 
    ```go
    type MyHandler struct{
-       stringTable yarn.StringTable
+       stringTable *yarn.StringTable
        // ... and your own fields ...
    }
 
    func (m *MyHandler) Line(line yarn.Line) error {
        // line.ID is the key into the string table.
        // StringTableRow.Text is the "string".
-       fmt.Println(m.stringTable[line.ID].Text)
+       text, _ := m.stringTable.Render(line)
+       fmt.Println(text)
        // You can block in here to give the player time to read the text.
        fmt.Println("\n\nPress ENTER to continue")
        fmt.Scanln()
@@ -45,7 +46,8 @@ options, and commands to the handler.
    func (m *MyHandler) Options(opts []yarn.Option) (int, error) {
        fmt.Println("Choose:")
        for _, opt := range opts {
-           fmt.Printf("%d: %s\n", opt.ID, m.stringTable[opt.Line.ID].Text)
+           text, _ := m.stringTable.Render(opt.Line)
+           fmt.Printf("%d: %s\n", opt.ID, text)
        }
        fmt.Print("Enter the number of your choice: ")
        var choice int
@@ -80,7 +82,7 @@ options, and commands to the handler.
        proto.Unmarshal(yarnc, program)
        csv, _ := os.Open("Example.yarn.csv")
        defer csv.Close()
-       stringTable, _ := yarn.ReadStringTable(csv)
+       stringTable, _ := yarn.ReadStringTable(csv, "en-AU")
        // Set up the DialogueHandler and the VirtualMachine:
        myHandler := &MyHandler{
            stringTable: stringTable,
@@ -93,7 +95,7 @@ options, and commands to the handler.
        }
        // Run the VirtualMachine!
        if err := vm.Run("Start"); err != nil {
-           log.Printf("VirtualMachine exeption: %v", err)
+           log.Printf("Yarn VM error: %v", err)
        }
    }
    ```
@@ -104,7 +106,7 @@ free to block execution - for example, on a channel operation:
 
 ```go
 type MyHandler struct {
-    stringTable yarn.StringTable
+    stringTable *yarn.StringTable
 
     dialogueDisplay Component
 
@@ -127,7 +129,8 @@ func (m *MyHandler) setWaiting(w bool) {
 
 // Line is called from the goroutine running VirtualMachine.Run.
 func (m *MyHandler) Line(line yarn.Line) error {
-    m.dialogueDisplay.Show(m.stringTable[line.ID].Text+"\n\nPress ENTER to continue")
+    text, _ := m.stringTable.Render(line)
+    m.dialogueDisplay.Show(text+"\n\nPress ENTER to continue")
     
     // Go into waiting-for-player-input state
     m.setWaiting(true)

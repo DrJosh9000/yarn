@@ -43,6 +43,7 @@ import (
 func main() {
 	yarncFilename := flag.String("program", "", "File name of program (e.g. Example.yarn.yarnc)")
 	csvFilename := flag.String("strings", "", "File name of string table (e.g. Example.yarn.csv)")
+	langCode := flag.String("lang", "en-AU", "Language code")
 	flag.Parse()
 
 	yarnc, err := ioutil.ReadFile(*yarncFilename)
@@ -59,7 +60,7 @@ func main() {
 		log.Fatalf("Couldn't open string table file: %v", err)
 	}
 	defer csv.Close()
-	stringTable, err := yarn.ReadStringTable(csv)
+	stringTable, err := yarn.ReadStringTable(csv, *langCode)
 	if err != nil {
 		log.Fatalf("Couldn't parse string table: %v", err)
 	}
@@ -82,12 +83,16 @@ func main() {
 // dialogueHandler implements yarn.DialogueHandler by playing the lines and
 // options on the terminal.
 type dialogueHandler struct {
-	stringTable    yarn.StringTable
+	stringTable    *yarn.StringTable
 	virtualMachine *yarn.VirtualMachine
 }
 
 func (h *dialogueHandler) Line(line yarn.Line) error {
-	fmt.Println(h.stringTable[line.ID].Text)
+	text, err := h.stringTable.Render(line)
+	if err != nil {
+		return err
+	}
+	fmt.Println(text)
 	fmt.Print("(Press ENTER to continue)")
 	fmt.Scanln()
 	// This next string is VT100 for "move to the first column, go up a line,
@@ -99,7 +104,11 @@ func (h *dialogueHandler) Line(line yarn.Line) error {
 func (h *dialogueHandler) Options(opts []yarn.Option) (int, error) {
 	fmt.Println("Choose:")
 	for _, opt := range opts {
-		fmt.Printf("%d: %s\n", opt.ID, h.stringTable[opt.Line.ID].Text)
+		text, err := h.stringTable.Render(opt.Line)
+		if err != nil {
+			return 0, err
+		}
+		fmt.Printf("%d: %s\n", opt.ID, text)
 	}
 	var choice int
 	for {
