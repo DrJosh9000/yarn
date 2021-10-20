@@ -83,23 +83,24 @@ func (t *StringTable) Render(line Line) (string, error) {
 	if !found {
 		return "", fmt.Errorf("no string %q in string table", line.ID)
 	}
-	return t.render(row.Text, line.Substitutions)
-}
-
-func (t *StringTable) render(text string, substs []string) (string, error) {
-	pl := new(parsedLine)
-	if err := lineParser.ParseString("", text, pl); err != nil {
+	// Parse the line according to the grammar below.
+	filename := fmt.Sprintf("%s:%d", row.File, row.LineNumber)
+	pl := new(parsedString)
+	if err := lineParser.ParseString(filename, row.Text, pl); err != nil {
 		return "", err
 	}
 
+	// Apply substitutions and format functions into a string builder.
 	var sb strings.Builder
-	if err := pl.assemble(&sb, substs); err != nil {
+	if err := pl.render(&sb, line.Substitutions); err != nil {
 		return "", err
 	}
 	return sb.String(), nil
 }
 
 var (
+	// This lexer is a bit more general than needed since it allows things like
+	// nested functions, but... hey I get nested functions for ~free!
 	lineLexer = lexer.MustStateful(lexer.Rules{
 		"Root": {
 			{Name: "Escaped", Pattern: `\\[{}\[\]"]`, Action: nil},
@@ -124,79 +125,25 @@ var (
 		},
 	})
 
+	// a line is a kind of string, just missing the quotes...
 	lineParser = participle.MustBuild(
-		&parsedLine{},
+		&parsedString{},
 		participle.Lexer(lineLexer),
 		participle.Elide("Whitespace"),
 	)
 )
 
-type parsedLine struct {
+type parsedString struct {
 	Fragments []*fragment `parser:"@@*"`
 }
 
-func (p *parsedLine) assemble(sb *strings.Builder, substs []string) error {
+func (p *parsedString) render(sb *strings.Builder, substs []string) error {
 	for _, f := range p.Fragments {
-		if err := f.assemble(sb, substs); err != nil {
+		if err := f.render(sb, substs); err != nil {
 			return err
 		}
 	}
 	return nil
-}
-
-type parsedFunc struct {
-	Name  string       `parser:"@Ident"`
-	Input *fragment    `parser:"\"\\\"\" @@ \"\\\"\""`
-	Opts  []*parsedOpt `parser:"@@+"`
-}
-
-func (f *parsedFunc) assemble(sb *strings.Builder, substs []string) error {
-	// input is a fragment that needs assembling
-	var inb strings.Builder
-	if err := f.Input.assemble(&inb, substs); err != nil {
-		return err
-	}
-	in := inb.String()
-
-	// function name determines lookup key
-	switch f.Name {
-	case "select":
-		// input chooses which value to interpolate
-		// (input == lookup key)
-		return f.findAndAssemble(sb, substs, in, in)
-
-	case "plural":
-		// TODO: use CLDR
-		if in == "1" {
-			return f.findAndAssemble(sb, substs, in, "one")
-		}
-		return f.findAndAssemble(sb, substs, in, "other")
-
-	case "ordinal":
-		// TODO: use CLDR
-		switch in {
-		case "1":
-			return f.findAndAssemble(sb, substs, in, "one")
-		case "2":
-			return f.findAndAssemble(sb, substs, in, "two")
-		case "3":
-			return f.findAndAssemble(sb, substs, in, "few")
-		default:
-			return f.findAndAssemble(sb, substs, in, "other")
-		}
-
-	default:
-		return fmt.Errorf("unknown format function %q", f.Name)
-	}
-}
-
-func (f *parsedFunc) findAndAssemble(sb *strings.Builder, substs []string, input, key string) error {
-	for _, opt := range f.Opts {
-		if opt.Key == key {
-			return opt.assemble(sb, substs, input)
-		}
-	}
-	return fmt.Errorf("key %q not found in %#v", key, f.Opts)
 }
 
 type fragment struct {
@@ -206,7 +153,7 @@ type fragment struct {
 	Text    string       `parser:"| @Char"`
 }
 
-func (s *fragment) assemble(sb *strings.Builder, substs []string) error {
+func (s *fragment) render(sb *strings.Builder, substs []string) error {
 	if s == nil {
 		return nil
 	}
@@ -214,20 +161,77 @@ func (s *fragment) assemble(sb *strings.Builder, substs []string) error {
 	case s.Escaped != "":
 		sb.WriteString(s.Escaped[1:])
 	case s.Func != nil:
-		return s.Func.assemble(sb, substs)
+		return s.Func.render(sb, substs)
 	case s.Subst != nil:
-		return s.Subst.assemble(sb, substs)
+		return s.Subst.render(sb, substs)
 	default:
 		sb.WriteString(s.Text)
 	}
 	return nil
 }
 
+type parsedFunc struct {
+	Name  string        `parser:"@Ident"`
+	Input *parsedString `parser:"\"\\\"\" @@ \"\\\"\""`
+	Opts  []*parsedOpt  `parser:"@@+"`
+}
+
+func (f *parsedFunc) render(sb *strings.Builder, substs []string) error {
+	// input is a fragment that needs assembling
+	var inb strings.Builder
+	if err := f.Input.render(&inb, substs); err != nil {
+		return err
+	}
+	in := inb.String()
+
+	// function name determines lookup key
+	switch f.Name {
+	case "select":
+		// input chooses which value to interpolate
+		// (input == lookup key)
+		return f.findAndRender(sb, substs, in, in)
+
+	case "plural":
+		// TODO: use CLDR
+		if in == "1" {
+			return f.findAndRender(sb, substs, in, "one")
+		}
+		return f.findAndRender(sb, substs, in, "other")
+
+	case "ordinal":
+		// TODO: use CLDR
+		switch in {
+		case "1":
+			return f.findAndRender(sb, substs, in, "one")
+		case "2":
+			return f.findAndRender(sb, substs, in, "two")
+		case "3":
+			return f.findAndRender(sb, substs, in, "few")
+		default:
+			return f.findAndRender(sb, substs, in, "other")
+		}
+
+	default:
+		return fmt.Errorf("unknown format function %q", f.Name)
+	}
+}
+
+// findAndRender searches f.Opts for the option matching the key, and then
+// renders that option to sb.
+func (f *parsedFunc) findAndRender(sb *strings.Builder, substs []string, input, key string) error {
+	for _, opt := range f.Opts {
+		if opt.Key == key {
+			return opt.render(sb, substs, input)
+		}
+	}
+	return fmt.Errorf("key %q not found in %#v", key, f.Opts)
+}
+
 type parsedSubst struct {
 	Index string `parser:"@Index"`
 }
 
-func (s *parsedSubst) assemble(sb *strings.Builder, substs []string) error {
+func (s *parsedSubst) render(sb *strings.Builder, substs []string) error {
 	n, err := strconv.Atoi(s.Index)
 	if err != nil {
 		return err
@@ -240,17 +244,19 @@ func (s *parsedSubst) assemble(sb *strings.Builder, substs []string) error {
 }
 
 type parsedOpt struct {
-	Key   string      `parser:"@Ident '='"`
-	Value []*fragment `parser:"\"\\\"\" @@* \"\\\"\""`
+	Key   string        `parser:"@Ident '='"`
+	Value *parsedString `parser:"\"\\\"\" @@ \"\\\"\""`
 }
 
-func (o *parsedOpt) assemble(sb *strings.Builder, substs []string, input string) error {
-	for _, v := range o.Value {
+func (o *parsedOpt) render(sb *strings.Builder, substs []string, input string) error {
+	// Options have an additional token that needs to be processed specially
+	// (%), so don't just call o.Value.render.
+	for _, v := range o.Value.Fragments {
 		if v.Text == "%" {
 			sb.WriteString(input)
 			continue
 		}
-		if err := v.assemble(sb, substs); err != nil {
+		if err := v.render(sb, substs); err != nil {
 			return err
 		}
 	}
