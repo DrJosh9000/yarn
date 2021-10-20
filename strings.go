@@ -23,6 +23,9 @@ import (
 
 	"github.com/alecthomas/participle/v2"
 	"github.com/alecthomas/participle/v2/lexer"
+	cldr "github.com/razor-1/localizer-cldr"
+	"golang.org/x/text/feature/plural"
+	"golang.org/x/text/language"
 )
 
 // StringTableRow contains all the information from one row in a string table.
@@ -34,13 +37,18 @@ type StringTableRow struct {
 // StringTable contains all the information from a string table, keyed by
 // string ID.
 type StringTable struct {
-	langCode string
-	table    map[string]StringTableRow
+	lang  language.Tag
+	table map[string]StringTableRow
 }
 
 // ReadStringTable reads a CSV-formatted string table from the reader. It
 // assumes the first row is a header.
 func ReadStringTable(r io.Reader, langCode string) (*StringTable, error) {
+	lang, err := language.Parse(langCode)
+	if err != nil {
+		return nil, fmt.Errorf("invalid lang code: %w", err)
+	}
+
 	st := make(map[string]StringTableRow)
 	header := true
 	cr := csv.NewReader(r)
@@ -71,8 +79,8 @@ func ReadStringTable(r io.Reader, langCode string) (*StringTable, error) {
 		}
 	}
 	return &StringTable{
-		langCode: langCode,
-		table:    st,
+		lang:  lang,
+		table: st,
 	}, nil
 }
 
@@ -92,7 +100,7 @@ func (t *StringTable) Render(line Line) (string, error) {
 
 	// Apply substitutions and format functions into a string builder.
 	var sb strings.Builder
-	if err := pl.render(&sb, line.Substitutions); err != nil {
+	if err := pl.render(&sb, line.Substitutions, t.lang); err != nil {
 		return "", err
 	}
 	return sb.String(), nil
@@ -137,9 +145,9 @@ type parsedString struct {
 	Fragments []*fragment `parser:"@@*"`
 }
 
-func (p *parsedString) render(sb *strings.Builder, substs []string) error {
+func (p *parsedString) render(sb *strings.Builder, substs []string, lang language.Tag) error {
 	for _, f := range p.Fragments {
-		if err := f.render(sb, substs); err != nil {
+		if err := f.render(sb, substs, lang); err != nil {
 			return err
 		}
 	}
@@ -153,7 +161,7 @@ type fragment struct {
 	Text    string       `parser:"| @Char"`
 }
 
-func (s *fragment) render(sb *strings.Builder, substs []string) error {
+func (s *fragment) render(sb *strings.Builder, substs []string, lang language.Tag) error {
 	if s == nil {
 		return nil
 	}
@@ -161,7 +169,7 @@ func (s *fragment) render(sb *strings.Builder, substs []string) error {
 	case s.Escaped != "":
 		sb.WriteString(s.Escaped[1:])
 	case s.Func != nil:
-		return s.Func.render(sb, substs)
+		return s.Func.render(sb, substs, lang)
 	case s.Subst != nil:
 		return s.Subst.render(sb, substs)
 	default:
@@ -176,10 +184,21 @@ type parsedFunc struct {
 	Opts  []*parsedOpt  `parser:"@@+"`
 }
 
-func (f *parsedFunc) render(sb *strings.Builder, substs []string) error {
+// maps plural.Form values to identifiers used in Yarn Spinner plural and
+// ordinal format functions
+var formKeyTable = []string{
+	plural.Other: "other",
+	plural.Zero:  "zero",
+	plural.One:   "one",
+	plural.Two:   "two",
+	plural.Few:   "few",
+	plural.Many:  "many",
+}
+
+func (f *parsedFunc) render(sb *strings.Builder, substs []string, lang language.Tag) error {
 	// input is a fragment that needs assembling
 	var inb strings.Builder
-	if err := f.Input.render(&inb, substs); err != nil {
+	if err := f.Input.render(&inb, substs, lang); err != nil {
 		return err
 	}
 	in := inb.String()
@@ -189,27 +208,29 @@ func (f *parsedFunc) render(sb *strings.Builder, substs []string) error {
 	case "select":
 		// input chooses which value to interpolate
 		// (input == lookup key)
-		return f.findAndRender(sb, substs, in, in)
+		return f.findAndRender(sb, substs, in, in, lang)
 
 	case "plural":
-		// TODO: use CLDR
-		if in == "1" {
-			return f.findAndRender(sb, substs, in, "one")
+		ops, err := cldr.NewOperands(in)
+		if err != nil {
+			return err
 		}
-		return f.findAndRender(sb, substs, in, "other")
+		form := plural.Cardinal.MatchPlural(lang, int(ops.I), int(ops.V), int(ops.W), int(ops.F), int(ops.T))
+		if int(form) > len(formKeyTable) {
+			return fmt.Errorf("plural form %v not supported", form)
+		}
+		return f.findAndRender(sb, substs, in, formKeyTable[form], lang)
 
 	case "ordinal":
-		// TODO: use CLDR
-		switch in {
-		case "1":
-			return f.findAndRender(sb, substs, in, "one")
-		case "2":
-			return f.findAndRender(sb, substs, in, "two")
-		case "3":
-			return f.findAndRender(sb, substs, in, "few")
-		default:
-			return f.findAndRender(sb, substs, in, "other")
+		ops, err := cldr.NewOperands(in)
+		if err != nil {
+			return err
 		}
+		form := plural.Ordinal.MatchPlural(lang, int(ops.I), int(ops.V), int(ops.W), int(ops.F), int(ops.T))
+		if int(form) > len(formKeyTable) {
+			return fmt.Errorf("plural form %v not supported", form)
+		}
+		return f.findAndRender(sb, substs, in, formKeyTable[form], lang)
 
 	default:
 		return fmt.Errorf("unknown format function %q", f.Name)
@@ -218,10 +239,10 @@ func (f *parsedFunc) render(sb *strings.Builder, substs []string) error {
 
 // findAndRender searches f.Opts for the option matching the key, and then
 // renders that option to sb.
-func (f *parsedFunc) findAndRender(sb *strings.Builder, substs []string, input, key string) error {
+func (f *parsedFunc) findAndRender(sb *strings.Builder, substs []string, input, key string, lang language.Tag) error {
 	for _, opt := range f.Opts {
 		if opt.Key == key {
-			return opt.render(sb, substs, input)
+			return opt.render(sb, substs, input, lang)
 		}
 	}
 	return fmt.Errorf("key %q not found in %#v", key, f.Opts)
@@ -248,7 +269,7 @@ type parsedOpt struct {
 	Value *parsedString `parser:"\"\\\"\" @@ \"\\\"\""`
 }
 
-func (o *parsedOpt) render(sb *strings.Builder, substs []string, input string) error {
+func (o *parsedOpt) render(sb *strings.Builder, substs []string, input string, lang language.Tag) error {
 	// Options have an additional token that needs to be processed specially
 	// (%), so don't just call o.Value.render.
 	for _, v := range o.Value.Fragments {
@@ -256,7 +277,7 @@ func (o *parsedOpt) render(sb *strings.Builder, substs []string, input string) e
 			sb.WriteString(input)
 			continue
 		}
-		if err := v.render(sb, substs); err != nil {
+		if err := v.render(sb, substs, lang); err != nil {
 			return err
 		}
 	}

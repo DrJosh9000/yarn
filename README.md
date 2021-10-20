@@ -11,9 +11,20 @@ string table) and `DialogueHandler` implementation, the `yarn.VirtualMachine`
 can execute the program as the original YarnSpinner VM would, delivering lines,
 options, and commands to the handler.
 
+## Supported features
+
+* ✅ All Yarn Spinner 2.0 machine opcodes and instruction forms.
+* ✅ Yarn Spinner CSV string tables.
+* ✅ String substitutions (`Hello, {0} - you're looking well!`).
+* ✅ `select` format function (`Hey [select "{0}" m="bro" f="sis" nb="doc"]`).
+* ✅ `plural` format function (`That'll be [plural "{0}" one="% dollar" other="% dollars"]`).
+* ✅ `ordinal` format function (`You are currently [ordinal "{0}" one="%st" two="%nd" few="%rd" other="%th"] in the queue`).
+   * ✅ ...including using Unicode CLDR for cardinal/ordinal form selection (`en-AU` not assumed!)
+
 ## Usage
 
-1. Compile your `.yarn` file, e.g. with the
+1. Compile your `.yarn` file. You can probably get the compiled output from a  
+   Unity project, or you can compile without using Unity with a tool like the
    [YarnSpinner Console](https://github.com/YarnSpinnerTool/YarnSpinner-Console):
 
    ```shell
@@ -100,9 +111,16 @@ options, and commands to the handler.
    }
    ```
 
-In a more typical game, `vm.Run` would happen in a separate goroutine. To avoid
-the VM delivering all the lines and options at once, your `DialogueHandler` is
-free to block execution - for example, on a channel operation:
+## Usage notes
+
+Note that using a Yarn Spinner 1.0 compiler will result in some unusual
+behaviour when compiling Yarn Spinner 2.0 source. For example, `<<jump .. >>`
+will be compiled as a command that your `DialogueHandler` must implement.
+Your implementation of `Command` may safely call `SetNode` on the VM.
+
+In a typical game, `vm.Run` would happen in a separate goroutine. To avoid the
+VM delivering all the lines and options at once, your `DialogueHandler` is
+allowed to block execution - for example, on a channel operation:
 
 ```go
 type MyHandler struct {

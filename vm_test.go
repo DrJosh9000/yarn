@@ -63,7 +63,7 @@ func TestAllTestPlans(t *testing.T) {
 				t.Fatalf("Open: %v", err)
 			}
 			defer csv.Close()
-			st, err := ReadStringTable(csv, "no locale")
+			st, err := ReadStringTable(csv, "en")
 			if err != nil {
 				t.Fatalf("ReadStringTable: %v", err)
 			}
