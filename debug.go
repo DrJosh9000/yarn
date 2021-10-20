@@ -16,13 +16,15 @@ package yarn
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	yarnpb "github.com/DrJosh9000/yarn/bytecode"
 )
 
 // FormatInstruction prints an instruction in a format convenient for
-// debugging. The output is intended for human consumption only.
+// debugging. The output is intended for human consumption only and may change
+// between incremental versions of this package.
 func FormatInstruction(inst *yarnpb.Instruction) string {
 	b := new(strings.Builder)
 	fmt.Fprint(b, inst.Opcode)
@@ -46,9 +48,24 @@ func FormatInstruction(inst *yarnpb.Instruction) string {
 }
 
 // FormatProgram prints a program in a format convenient for debugging. The
-// output is intended for human consumption only.
+// output is intended for human consumption only and may change between
+// incremental versions of this package.
 func FormatProgram(prog *yarnpb.Program) string {
-	b := new(strings.Builder)
+	sb := new(strings.Builder)
+
+	// Make all the labels line up, even across nodes
+	labelWidth := 0
+	for _, node := range prog.Nodes {
+		for l := range node.Labels {
+			if len(l) > labelWidth {
+				labelWidth = len(l)
+			}
+		}
+	}
+	labelFmt := "% " + strconv.Itoa(labelWidth) + "s: "
+	labelSpace := strings.Repeat(" ", labelWidth+2)
+
+	// Now print the program into the string builder
 	for name, node := range prog.Nodes {
 		// Quick reverse label table
 		labels := make(map[int]string)
@@ -56,15 +73,16 @@ func FormatProgram(prog *yarnpb.Program) string {
 			labels[int(a)] = l
 		}
 
-		fmt.Fprintf(b, "\n%s:\n", name)
+		fmt.Fprintf(sb, "%s--- %s ---\n", labelSpace, name)
 		for n, inst := range node.Instructions {
-			if l, ok := labels[n]; ok {
-				fmt.Fprintf(b, "% 15s: ", l)
+			if l := labels[n]; l != "" {
+				fmt.Fprintf(sb, labelFmt, l)
 			} else {
-				fmt.Fprint(b, strings.Repeat(" ", 17))
+				fmt.Fprint(sb, labelSpace)
 			}
-			fmt.Fprintf(b, "%06d %s\n", n, FormatInstruction(inst))
+			fmt.Fprintf(sb, "%06d %s\n", n, FormatInstruction(inst))
 		}
+		fmt.Fprintln(sb)
 	}
-	return b.String()
+	return sb.String()
 }

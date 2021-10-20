@@ -42,6 +42,7 @@ import (
 func main() {
 	yarncFilename := flag.String("program", "", "File name of program (e.g. Example.yarn.yarnc)")
 	csvFilename := flag.String("strings", "", "File name of string table (e.g. Example.yarn.csv)")
+	startNode := flag.String("start", "Start", "Name of the node to run")
 	langCode := flag.String("lang", "en-AU", "Language code")
 	flag.Parse()
 
@@ -74,8 +75,8 @@ func main() {
 	}
 	h.virtualMachine = vm
 
-	if err := vm.Run("Start"); err != nil {
-		log.Printf("VirtualMachine exeption: %v", err)
+	if err := vm.Run(*startNode); err != nil {
+		log.Printf("Yarn VM error: %v", err)
 	}
 }
 
