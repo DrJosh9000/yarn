@@ -8,8 +8,8 @@ Example-Start-5,B: And you're in it!,Example,Start,10
 Example-Start-6,A: How delightful!,Example,Start,12
 Example-Start-7,B: What would you prefer to do next?,Example,Start,13
 Example-Start-8,Leave,Example,Start,14
-Example-Start-9,Learn more,Example,Start,16
-Example-Leave-10,"A: Oh, goodbye!",Example,Leave,24
-Example-Leave-11,B: You'll be back soon!,Example,Leave,25
+Example-Start-9,Learn more,Example,Start,15
+Example-Leave-10,"A: Oh, goodbye!",Example,Leave,22
+Example-Leave-11,B: You'll be back soon!,Example,Leave,23
 line:LearnMore,"A: HAHAHA
-",Example,LearnMore,32
+",Example,LearnMore,30

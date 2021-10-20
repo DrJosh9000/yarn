@@ -33,8 +33,8 @@ options, and commands to the handler.
    }
 
    func (m *MyHandler) Line(line yarn.Line) error {
-       // line.ID is the key into the string table.
-       // StringTableRow.Text is the "string".
+       // StringTable's Render turns the Line into a string, applying all the
+       // substitutions and format functions that might be present.
        text, _ := m.stringTable.Render(line)
        fmt.Println(text)
        // You can block in here to give the player time to read the text.

@@ -1,4 +1,0 @@
-id,text,file,node,lineNumber
-Jumps-Start-0,Start line,Jumps,Start,3
-Jumps-Start-1,This line will never be shown.,Jumps,Start,5
-Jumps-Destination-2,Destination line,Jumps,Destination,9

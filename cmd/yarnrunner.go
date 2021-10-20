@@ -33,7 +33,6 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"strings"
 
 	"github.com/DrJosh9000/yarn"
 	yarnpb "github.com/DrJosh9000/yarn/bytecode"
@@ -121,16 +120,9 @@ func (h *dialogueHandler) Options(opts []yarn.Option) (int, error) {
 	return choice, nil
 }
 
-func (h *dialogueHandler) Command(command string) error {
-	// Just implement "jump" for this example
-	if strings.HasPrefix(command, "jump ") {
-		return h.virtualMachine.SetNode(strings.TrimPrefix(command, "jump "))
-	}
-	return nil
-}
-
 // Don't care about any of these:
 
+func (h *dialogueHandler) Command(string) error           { return nil }
 func (h *dialogueHandler) NodeStart(string) error         { return nil }
 func (h *dialogueHandler) PrepareForLines([]string) error { return nil }
 func (h *dialogueHandler) NodeComplete(string) error      { return nil }

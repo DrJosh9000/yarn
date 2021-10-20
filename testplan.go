@@ -140,12 +140,6 @@ func (p *TestPlan) Options(opts []Option) (int, error) {
 
 // Command handles the command... somehow.
 func (p *TestPlan) Command(command string) error {
-	// Handle "commands" that should be compiled differently ?
-	if strings.HasPrefix(command, "jump ") {
-		// v2 should compile this as RUN_NODE, I guess?
-		return p.VirtualMachine.SetNode(strings.TrimPrefix(command, "jump "))
-	}
-
 	if p.Step >= len(p.Steps) {
 		return errors.New("next testplan step after end")
 	}
@@ -154,7 +148,9 @@ func (p *TestPlan) Command(command string) error {
 		return fmt.Errorf("testplan got command, want %q", step.Type)
 	}
 	p.Step++
-	// TODO: check the command
+	if command != step.Contents {
+		return fmt.Errorf("testplan got command %q, want %q", command, step.Contents)
+	}
 	return nil
 }
 
