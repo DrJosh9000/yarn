@@ -182,5 +182,6 @@ func (m *MyHandler) Update() error {
 This project is available under the Apache 2.0 license. See the `LICENSE` file
 for more information.
 
-The `testdata` directory contains files or derivative works from Yarn Spinner.
- See `testdata/README.md` for more information.
+The `bytecode` and `testdata` directories contains files or derivative works
+from Yarn Spinner. See `bytecode/README.md` and `testdata/README.md` for more
+information.
