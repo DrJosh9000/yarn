@@ -1,10 +1,12 @@
 # yarn
 
+A Go implementation of parts of Yarn Spinner.
+
 [![Go Reference](https://pkg.go.dev/badge/github.com/DrJosh9000/yarn.svg)](https://pkg.go.dev/github.com/DrJosh9000/yarn)
 [![Go Report Card](https://goreportcard.com/badge/github.com/DrJosh9000/yarn)](https://goreportcard.com/report/github.com/DrJosh9000/yarn)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/DrJosh9000/yarn/blob/main/LICENSE)
 
-The yarn package is a work-in-progress Go implementation of the
+The yarn package is a Go implementation of the
 [YarnSpinner](https://github.com/YarnSpinnerTool/YarnSpinner) virtual machine
 and dialogue system. Given a compiled `.yarn` file (into the VM bytecode and
 string table) and `DialogueHandler` implementation, the `yarn.VirtualMachine`
@@ -19,7 +21,7 @@ options, and commands to the handler.
 * ✅ `select` format function (`Hey [select "{0}" m="bro" f="sis" nb="doc"]`).
 * ✅ `plural` format function (`That'll be [plural "{0}" one="% dollar" other="% dollars"]`).
 * ✅ `ordinal` format function (`You are currently [ordinal "{0}" one="%st" two="%nd" few="%rd" other="%th"] in the queue`).
-   * ✅ ...including using Unicode CLDR for cardinal/ordinal form selection (`en-AU` not assumed!)
+  * ✅ ...including using Unicode CLDR for cardinal/ordinal form selection (`en-AU` not assumed!)
 
 ## Usage
 
@@ -174,3 +176,11 @@ func (m *MyHandler) Update() error {
     //...
 }
 ```
+
+## Licence
+
+This project is available under the Apache 2.0 license. See the `LICENSE` file
+for more information.
+
+The `testdata` directory contains files or derivative works from Yarn Spinner.
+ See `testdata/README.md` for more information.
