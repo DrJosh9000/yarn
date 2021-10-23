@@ -62,7 +62,7 @@ func TestAllTestPlans(t *testing.T) {
 						return nil
 					},
 					// Used by Functions.yarn
-					// TODO: use ints like the real YarnSpinner
+					// TODO: support ints like the real Yarn Spinner
 					"add_three_operands": func(x, y, z float32) float32 {
 						return x + y + z
 					},

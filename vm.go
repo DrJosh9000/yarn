@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package yarn implements the YarnSpinner VM (see github.com/YarnSpinnerTool/YarnSpinner).
+// Package yarn implements the Yarn Spinner virtual machine and dialogue system.
+// For the original implementation, see https://yarnspinner.dev and
+// https://github.com/YarnSpinnerTool/YarnSpinner.
 package yarn // import "github.com/DrJosh9000/yarn"
 
 import (

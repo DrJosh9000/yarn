@@ -7,10 +7,10 @@ A Go implementation of parts of Yarn Spinner.
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/DrJosh9000/yarn/blob/main/LICENSE)
 
 The yarn package is a Go implementation of the
-[YarnSpinner](https://github.com/YarnSpinnerTool/YarnSpinner) virtual machine
+[Yarn Spinner](https://github.com/YarnSpinnerTool/YarnSpinner) virtual machine
 and dialogue system. Given a compiled `.yarn` file (into the VM bytecode and
 string table) and `DialogueHandler` implementation, the `yarn.VirtualMachine`
-can execute the program as the original YarnSpinner VM would, delivering lines,
+can execute the program as the original Yarn Spinner VM would, delivering lines,
 options, and commands to the handler.
 
 ## Supported features
@@ -27,7 +27,7 @@ options, and commands to the handler.
 
 1. Compile your `.yarn` file. You can probably get the compiled output from a  
    Unity project, or you can compile without using Unity with a tool like the
-   [YarnSpinner Console](https://github.com/YarnSpinnerTool/YarnSpinner-Console):
+   [Yarn Spinner Console](https://github.com/YarnSpinnerTool/YarnSpinner-Console):
 
    ```shell
    ysc compile Example.yarn
@@ -99,7 +99,7 @@ options, and commands to the handler.
            Handler: myHandler,
            Vars: make(yarn.MapVariableStorage), // or your own VariableStorage implementation
        }
-       
+
        // Run the VirtualMachine starting with the Start node!
        vm.Run("Start")
    }

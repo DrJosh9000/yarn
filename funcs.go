@@ -18,8 +18,9 @@ import (
 	"fmt"
 )
 
-// FuncMap works like text/template.FuncMap. It maps function names to
-// implementations. Each implementation must return 0, 1, or 2 args.
+// FuncMap maps function names to implementations. Each function must return 0,
+// 1, or 2 values, and if 2 are returned, the latter must be type `error`.
+// It is similar to the text/template FuncMap.
 type FuncMap map[string]interface{}
 
 // merge merges fm into m and returns m.
@@ -30,7 +31,7 @@ func (m FuncMap) merge(fm FuncMap) FuncMap {
 	return m
 }
 
-// defaultFuncMap returns a FuncMap with all the basic YarnSpinner operators.
+// defaultFuncMap returns a FuncMap with the standard Yarn Spinner operators.
 func defaultFuncMap() FuncMap {
 	return FuncMap{
 		"None":                 func(x interface{}) interface{} { return x },
