@@ -9,7 +9,7 @@ A Go implementation of parts of Yarn Spinner.
 The yarn package is a Go implementation of the
 [Yarn Spinner](https://github.com/YarnSpinnerTool/YarnSpinner) virtual machine
 and dialogue system. Given a compiled `.yarn` file (into the VM bytecode and
-string table) and `DialogueHandler` implementation, the `yarn.VirtualMachine`
+string table) and `DialogueHandler` implementation, the `VirtualMachine`
 can execute the program as the original Yarn Spinner VM would, delivering lines,
 options, and commands to the handler.
 
