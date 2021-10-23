@@ -16,15 +16,9 @@ package yarn
 
 import (
 	"errors"
-	"io/ioutil"
-	"log"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-
-	yarnpb "github.com/DrJosh9000/yarn/bytecode"
-	"google.golang.org/protobuf/proto"
 )
 
 const traceOutput = false
@@ -37,43 +31,22 @@ func TestAllTestPlans(t *testing.T) {
 
 	for _, tpn := range testplans {
 		t.Run(tpn, func(t *testing.T) {
-			tpf, err := os.Open(tpn)
+			testplan, err := LoadTestPlanFile(tpn)
 			if err != nil {
-				t.Fatalf("Open: %v", err)
-			}
-			defer tpf.Close()
-			testplan, err := ReadTestPlan(tpf)
-			if err != nil {
-				t.Fatalf("ReadTestPlan: %v", err)
+				t.Fatalf("LoadTestPlanFile(%q) = error %v", tpn, err)
 			}
 
 			base := strings.TrimSuffix(filepath.Base(tpn), ".testplan")
 
-			yarnc, err := ioutil.ReadFile("testdata/" + base + ".yarn.yarnc")
+			yarnc := "testdata/" + base + ".yarn.yarnc"
+			csv := "testdata/" + base + ".yarn.csv"
+			prog, st, err := LoadFiles(yarnc, csv, "en")
 			if err != nil {
-				t.Fatalf("ReadFile: %v", err)
-			}
-			var prog yarnpb.Program
-			if err := proto.Unmarshal(yarnc, &prog); err != nil {
-				t.Fatalf("proto.Unmarshal: %v", err)
-			}
-
-			csv, err := os.Open("testdata/" + base + ".yarn.csv")
-			if err != nil {
-				t.Fatalf("Open: %v", err)
-			}
-			defer csv.Close()
-			st, err := ReadStringTable(csv, "en")
-			if err != nil {
-				t.Fatalf("ReadStringTable: %v", err)
-			}
-
-			if traceOutput {
-				log.Print(FormatProgram(&prog))
+				t.Fatalf("LoadFiles(%q, %q, en) = error %v", yarnc, csv, err)
 			}
 
 			vm := &VirtualMachine{
-				Program: &prog,
+				Program: prog,
 				Handler: testplan,
 				Vars:    make(MapVariableStorage),
 				FuncMap: FuncMap{
@@ -100,13 +73,14 @@ func TestAllTestPlans(t *testing.T) {
 						return x[len(x)-1], nil
 					},
 				},
-				TraceLog: traceOutput,
 			}
 			testplan.StringTable = st
-			testplan.VirtualMachine = vm
+			if traceOutput {
+				vm.TraceLogf = t.Logf
+			}
 
 			if err := vm.Run("Start"); err != nil {
-				t.Errorf("vm.Run() = %v", err)
+				t.Errorf("vm.Run(Start) = %v", err)
 			}
 			if err := testplan.Complete(); err != nil {
 				t.Errorf("testplan incomplete: %v", err)

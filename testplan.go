@@ -19,30 +19,39 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strconv"
 	"strings"
 )
 
-// TestStep is a step in a test plan.
-type TestStep struct {
-	Type     string
-	Contents string
-}
-
-func (s TestStep) String() string { return s.Type + ": " + s.Contents }
-
-// TestPlan is a helper for .testplan files.
+// TestPlan implements test plans. A test plan is a dialogue handler that
+// expects specific lines and options from the dialogue system.
 type TestPlan struct {
-	Steps []TestStep
-	Step  int
+	StringTable *StringTable
+	Steps       []TestStep
+	Step        int
 
-	DialogueCompleted bool
+	dialogueCompleted bool
 
-	StringTable    *StringTable
-	VirtualMachine *VirtualMachine
+	FakeDialogueHandler // implements remaining methods
 }
 
-// ReadTestPlan reads a testplan file into a TestPlan.
+// LoadTestPlanFile is a convenient function for loading a test plan given a
+// file path.
+func LoadTestPlanFile(testPlanPath string) (*TestPlan, error) {
+	tpf, err := os.Open(testPlanPath)
+	if err != nil {
+		return nil, fmt.Errorf("opening testplan file: %w", err)
+	}
+	defer tpf.Close()
+	tp, err := ReadTestPlan(tpf)
+	if err != nil {
+		return nil, fmt.Errorf("reading testplan file: %w", err)
+	}
+	return tp, nil
+}
+
+// ReadTestPlan reads a testplan from an io.Reader into a TestPlan.
 func ReadTestPlan(r io.Reader) (*TestPlan, error) {
 	var tp TestPlan
 	sc := bufio.NewScanner(r)
@@ -71,13 +80,21 @@ func ReadTestPlan(r io.Reader) (*TestPlan, error) {
 	return &tp, nil
 }
 
+// TestStep is a step in a test plan.
+type TestStep struct {
+	Type     string
+	Contents string
+}
+
+func (s TestStep) String() string { return s.Type + ": " + s.Contents }
+
 // Complete checks if the test plan was completed.
 func (p *TestPlan) Complete() error {
 	if p.Step != len(p.Steps) {
 		return fmt.Errorf("on step %d %v", p.Step, p.Steps[p.Step])
 	}
-	if !p.DialogueCompleted {
-		return errors.New("did not receive DialogueCompleted")
+	if !p.dialogueCompleted {
+		return errors.New("did not receive DialogueComplete")
 	}
 	return nil
 }
@@ -156,15 +173,6 @@ func (p *TestPlan) Command(command string) error {
 
 // DialogueComplete records the event in p.DialogueCompleted.
 func (p *TestPlan) DialogueComplete() error {
-	p.DialogueCompleted = true
+	p.dialogueCompleted = true
 	return nil
 }
-
-// NodeStart does nothing and returns nil.
-func (p *TestPlan) NodeStart(string) error { return nil }
-
-// NodeComplete does nothing and returns nil.
-func (p *TestPlan) NodeComplete(string) error { return nil }
-
-// PrepareForLines does nothing and returns nil.
-func (p *TestPlan) PrepareForLines([]string) error { return nil }

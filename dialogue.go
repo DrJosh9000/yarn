@@ -70,27 +70,3 @@ type DialogueHandler interface {
 	// DialogueComplete is called when the dialogue as a whole is complete.
 	DialogueComplete() error
 }
-
-// FakeDialogueHandler implements DialogueHandler with minimal methods.
-type FakeDialogueHandler struct{}
-
-// NodeStart returns nil.
-func (FakeDialogueHandler) NodeStart(string) error { return nil }
-
-// PrepareForLines returns nil.
-func (FakeDialogueHandler) PrepareForLines([]string) error { return nil }
-
-// Line returns nil.
-func (FakeDialogueHandler) Line(Line) error { return nil }
-
-// Options returns the first option ID and nil.
-func (FakeDialogueHandler) Options(options []Option) (int, error) { return options[0].ID, nil }
-
-// Command returns nil.
-func (FakeDialogueHandler) Command(string) error { return nil }
-
-// NodeComplete returns nil.
-func (FakeDialogueHandler) NodeComplete(string) error { return nil }
-
-// DialogueComplete returns nil.
-func (FakeDialogueHandler) DialogueComplete() error { return nil }

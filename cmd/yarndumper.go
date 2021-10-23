@@ -19,33 +19,25 @@
 //
 // Quick usage from the root of the repo:
 //
-//    go run -tags example cmd/yarndumper.go \
-//        --program=testdata/Example.yarn.yarnc \
+//    go run -tags example cmd/yarndumper.go testdata/Example.yarn.yarnc
 package main
 
 import (
-	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
+	"os"
 
 	"github.com/DrJosh9000/yarn"
-	yarnpb "github.com/DrJosh9000/yarn/bytecode"
-	"google.golang.org/protobuf/proto"
 )
 
 func main() {
-	yarncFilename := flag.String("program", "", "File name of program (e.g. Example.yarn.yarnc)")
-	flag.Parse()
-
-	yarnc, err := ioutil.ReadFile(*yarncFilename)
+	if len(os.Args) != 2 {
+		fmt.Fprint(os.Stderr, "Usage: yarndumper YARNC_FILE")
+		os.Exit(1)
+	}
+	program, err := yarn.LoadProgramFile(os.Args[1])
 	if err != nil {
 		log.Fatalf("Couldn't read program file: %v", err)
 	}
-	program := new(yarnpb.Program)
-	if err := proto.Unmarshal(yarnc, program); err != nil {
-		log.Fatalf("Couldn't unmarshal program: %v", err)
-	}
-
-	fmt.Println(yarn.FormatProgram(program))
+	yarn.FormatProgram(os.Stdout, program)
 }

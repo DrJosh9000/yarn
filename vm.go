@@ -18,77 +18,106 @@ package yarn // import "github.com/DrJosh9000/yarn"
 import (
 	"errors"
 	"fmt"
-	"log"
 	"reflect"
 	"strings"
 
 	yarnpb "github.com/DrJosh9000/yarn/bytecode"
 )
 
-// BUG: This package hasn't been used or tested yet, and is incomplete.
-
-// Various sentinel errors.
-var (
-	// ErrNoNodeSelected indicates the VM tried to run but SetNode hadn't been
-	// called.
-	ErrNoNodeSelected = errors.New("no node selected to run")
-
-	// ErrWaitingOnOptionSelection indicates the VM delivered options to the
-	// handler, but an option hasn't been selected (with SetSelectedOption).
-	ErrWaitingOnOptionSelection = errors.New("waiting on option selection")
-
+// Various sentinel errors returned by the virtual machine.
+const (
 	// ErrNilDialogueHandler indicates that Handler hasn't been set.
-	ErrNilDialogueHandler = errors.New("nil dialogue handler")
+	ErrNilDialogueHandler = virtualMachineError("nil dialogue handler")
 
 	// ErrNilVariableStorage indicates that Vars hasn't been set.
-	ErrNilVariableStorage = errors.New("nil variable storage")
+	ErrNilVariableStorage = virtualMachineError("nil variable storage")
 
 	// ErrMissingProgram indicates that Program hasn't been set.
-	ErrMissingProgram = errors.New("missing or empty program")
+	ErrMissingProgram = virtualMachineError("missing or empty program")
 
 	// ErrNoOptions indicates the program is invalid - it tried to show options
 	// but none had been added.
-	ErrNoOptions = errors.New("no options were added")
+	ErrNoOptions = virtualMachineError("no options were added")
 
 	// ErrStackUnderflow indicates the program tried to pop or peek when the
 	// stack was empty.
-	ErrStackUnderflow = errors.New("stack underflow")
+	ErrStackUnderflow = virtualMachineError("stack underflow")
 
-	// ErrWrongType indicates the program needed a value of one type, but got
-	// something else instead.
-	ErrWrongType = errors.New("wrong type")
+	// ErrWrongType indicates the program needed a stack value, operand, or
+	// function of one type, but got something else instead.
+	ErrWrongType = virtualMachineError("wrong type")
 
-	// Internal error for signifying a machine stop.
-	errStop = errors.New("stopped")
+	// ErrNotConvertible indicates the program tried to convert a stack value
+	// or operand to a different type, but it was not convertible to that type.
+	ErrNotConvertible = virtualMachineError("not convertible")
+
+	// ErrNodeNotFound is returned where Run or SetNode is passed the name of a
+	// node that is not in the program.
+	ErrNodeNotFound = virtualMachineError("node not found")
+
+	// ErrLabelNotFound indicates the program tries to jump to a label that
+	// isn't in the label table for the current node.
+	ErrLabelNotFound = virtualMachineError("label not found")
+
+	// ErrNilOperand indicates the a malformed program containing an instruction
+	// that requires a usable operand but the operand was nil.
+	ErrNilOperand = virtualMachineError("nil operand")
+
+	// ErrFunctionNotFound indicates the program tried to call a function but
+	// that function is not in the FuncMap.
+	ErrFunctionNotFound = virtualMachineError("function not found")
+
+	// ErrFunctionArgMismatch indicates the program tried to call a function but
+	// had the wrong number or types of args to pass to it.
+	ErrFunctionArgMismatch = virtualMachineError("arg mismatch")
 )
 
-// Used to check the second return arg of functions in FuncMap.
+// Stop stops the virtual machine without error. It is used by the STOP
+// instruction, but can also be returned by your handler to stop the VM in the
+// same way. However a stop happens, NodeComplete and DialogueComplete are still
+// called.
+const Stop = virtualMachineError("stop")
+
+// Used to typecheck the second return arg of functions in FuncMap.
 var errorType = reflect.TypeOf((*error)(nil)).Elem()
+
+// Used to implement the sentinel errors as consts instead of vars.
+type virtualMachineError string
+
+func (e virtualMachineError) Error() string { return string(e) }
 
 // VirtualMachine implements the Yarn Spinner virtual machine.
 type VirtualMachine struct {
-	state state
-
-	// Program to execute
+	// Program is the program to execute.
 	Program *yarnpb.Program
 
-	// Handlers / callbacks
+	// Handler receives content (lines, options, etc) and other events.
 	Handler DialogueHandler
-	Vars    VariableStorage
+
+	// Vars stores variables used and provided by the dialogue.
+	Vars VariableStorage
+
+	// FuncMap is used to provide user-defined functions.
 	FuncMap FuncMap
 
-	// Debugging options
-	TraceLog bool
+	// TraceLogf, if not nil, is called before each instruction to log the
+	// current stack, options, and the instruction about to be executed.
+	TraceLogf func(string, ...interface{})
+
+	state state
 }
 
-// SetNode sets the VM to begin a node.
+// SetNode sets the VM to begin a node. If a node is already selected,
+// NodeComplete will be called for that node. Then NodeStart and PrepareForLines
+// will be called (for the newly selected node). Passing the current node is one
+// way to reset to the start of the node.
 func (vm *VirtualMachine) SetNode(name string) error {
-	if vm.Program == nil || len(vm.Program.Nodes) == 0 {
+	if vm.Program == nil {
 		return ErrMissingProgram
 	}
 	node, found := vm.Program.Nodes[name]
 	if !found {
-		return fmt.Errorf("node %q not found", name)
+		return ErrNodeNotFound
 	}
 
 	// Designate the current node complete.
@@ -120,7 +149,7 @@ func (vm *VirtualMachine) SetNode(name string) error {
 	return nil
 }
 
-// Run executes the VM.
+// Run executes the program, starting at a particular node.
 func (vm *VirtualMachine) Run(startNode string) error {
 	if vm.Handler == nil {
 		return ErrNilDialogueHandler
@@ -134,30 +163,59 @@ func (vm *VirtualMachine) Run(startNode string) error {
 	if err := vm.SetNode(startNode); err != nil {
 		return err
 	}
-	// Run!
+	// Run! This is the instruction loop.
+instructionLoop:
 	for vm.state.pc < len(vm.state.node.Instructions) {
 		inst := vm.state.node.Instructions[vm.state.pc]
-		if vm.TraceLog {
-			log.Printf("stack %v; options %v", vm.state.stack, vm.state.options)
-			log.Printf("% 15s %06d %s", vm.state.node.Name, vm.state.pc, FormatInstruction(inst))
+		if vm.TraceLogf != nil {
+			vm.TraceLogf("stack %v; options %v", vm.state.stack, vm.state.options)
+			vm.TraceLogf("% 15s %06d %s", vm.state.node.Name, vm.state.pc, FormatInstruction(inst))
 		}
-		err := vm.execute(inst)
-		if err == errStop {
-			// machine has stopped
-			break
-		}
-		if err != nil {
-			// exception
+		switch err := vm.execute(inst); {
+		case errors.Is(err, Stop): // machine has stopped
+			break instructionLoop
+		case err != nil: // something else
 			return fmt.Errorf("%s %06d %s: %w", vm.state.node.Name, vm.state.pc, FormatInstruction(inst), err)
 		}
 	}
-	if err := vm.Handler.NodeComplete(vm.state.node.Name); err != nil {
+	if err := vm.Handler.NodeComplete(vm.state.node.Name); err != nil && !errors.Is(err, Stop) {
 		return fmt.Errorf("handler.NodeComplete: %w", err)
 	}
-	if err := vm.Handler.DialogueComplete(); err != nil {
+	if err := vm.Handler.DialogueComplete(); err != nil && !errors.Is(err, Stop) {
 		return fmt.Errorf("handler.DialogueComplete: %w", err)
 	}
 	return nil
+}
+
+func (vm *VirtualMachine) execute(inst *yarnpb.Instruction) error {
+	if inst.Opcode < 0 || int(inst.Opcode) >= len(dispatchTable) {
+		return fmt.Errorf("invalid opcode %v", inst.Opcode)
+	}
+	exec := dispatchTable[inst.Opcode]
+	if exec == nil {
+		return fmt.Errorf("invalid opcode %v", inst.Opcode)
+	}
+	return exec(vm, inst.Operands)
+}
+
+var dispatchTable = []func(*VirtualMachine, []*yarnpb.Operand) error{
+	yarnpb.Instruction_JUMP_TO:        (*VirtualMachine).execJumpTo,
+	yarnpb.Instruction_JUMP:           (*VirtualMachine).execJump,
+	yarnpb.Instruction_RUN_LINE:       (*VirtualMachine).execRunLine,
+	yarnpb.Instruction_RUN_COMMAND:    (*VirtualMachine).execRunCommand,
+	yarnpb.Instruction_ADD_OPTION:     (*VirtualMachine).execAddOption,
+	yarnpb.Instruction_SHOW_OPTIONS:   (*VirtualMachine).execShowOptions,
+	yarnpb.Instruction_PUSH_STRING:    (*VirtualMachine).execPushString,
+	yarnpb.Instruction_PUSH_FLOAT:     (*VirtualMachine).execPushFloat,
+	yarnpb.Instruction_PUSH_BOOL:      (*VirtualMachine).execPushBool,
+	yarnpb.Instruction_PUSH_NULL:      (*VirtualMachine).execPushNull,
+	yarnpb.Instruction_JUMP_IF_FALSE:  (*VirtualMachine).execJumpIfFalse,
+	yarnpb.Instruction_POP:            (*VirtualMachine).execPop,
+	yarnpb.Instruction_CALL_FUNC:      (*VirtualMachine).execCallFunc,
+	yarnpb.Instruction_PUSH_VARIABLE:  (*VirtualMachine).execPushVariable,
+	yarnpb.Instruction_STORE_VARIABLE: (*VirtualMachine).execStoreVariable,
+	yarnpb.Instruction_STOP:           (*VirtualMachine).execStop,
+	yarnpb.Instruction_RUN_NODE:       (*VirtualMachine).execRunNode,
 }
 
 func (vm *VirtualMachine) execJumpTo(operands []*yarnpb.Operand) error {
@@ -166,7 +224,7 @@ func (vm *VirtualMachine) execJumpTo(operands []*yarnpb.Operand) error {
 	k := operands[0].GetStringValue()
 	pc, ok := vm.state.node.Labels[k]
 	if !ok {
-		return fmt.Errorf("unknown label %q in node %q", k, vm.state.node.Name)
+		return fmt.Errorf("%q %w in node %q", k, ErrLabelNotFound, vm.state.node.Name)
 	}
 	vm.state.pc = int(pc)
 	return nil
@@ -182,7 +240,7 @@ func (vm *VirtualMachine) execJump([]*yarnpb.Operand) error {
 	}
 	pc, ok := vm.state.node.Labels[k]
 	if !ok {
-		return fmt.Errorf("unknown label %q in node %q", k, vm.state.node.Name)
+		return fmt.Errorf("%q %w in node %q", k, ErrLabelNotFound, vm.state.node.Name)
 	}
 	vm.state.pc = int(pc)
 	return nil
@@ -358,7 +416,7 @@ func (vm *VirtualMachine) execJumpIfFalse(operands []*yarnpb.Operand) error {
 	k := operands[0].GetStringValue()
 	pc, ok := vm.state.node.Labels[k]
 	if !ok {
-		return fmt.Errorf("unknown label %q", k)
+		return fmt.Errorf("%q %w in node %q", k, ErrLabelNotFound, vm.state.node.Name)
 	}
 	vm.state.pc = int(pc)
 	return nil
@@ -385,11 +443,11 @@ func (vm *VirtualMachine) execCallFunc(operands []*yarnpb.Operand) error {
 	funcname := operands[0].GetStringValue()
 	function, found := vm.FuncMap[funcname]
 	if !found {
-		return fmt.Errorf("function %q not found", funcname)
+		return fmt.Errorf("%q %w", funcname, ErrFunctionNotFound)
 	}
 	functype := reflect.TypeOf(function)
 	if functype.Kind() != reflect.Func {
-		return fmt.Errorf("function %q not actually a function [type %T]", funcname, function)
+		return fmt.Errorf("%w: function for %q not actually a function [type %T]", ErrWrongType, funcname, function)
 	}
 	// Compiler puts number of args on top of stack
 	gotx, err := vm.state.pop()
@@ -405,10 +463,10 @@ func (vm *VirtualMachine) execCallFunc(operands []*yarnpb.Operand) error {
 	case functype.IsVariadic() && gotArgc < wantArgc-1:
 		// The last (variadic) arg is free to be empty. But we don't even have
 		// that many...
-		return fmt.Errorf("insufficient args provided by program [got %d < want %d]", gotArgc, wantArgc-1)
+		return fmt.Errorf("%w: insufficient args provided by program [got %d < want %d]", ErrFunctionArgMismatch, gotArgc, wantArgc-1)
 	case !functype.IsVariadic() && gotArgc != wantArgc:
 		// Gotta match exactly.
-		return fmt.Errorf("wrong number of args provided by program [got %d, want %d]", gotArgc, wantArgc)
+		return fmt.Errorf("%w: wrong number of args provided by program [got %d, want %d]", ErrFunctionArgMismatch, gotArgc, wantArgc)
 	}
 
 	// Also check that function returns between 0 and 2 args; if there are two,
@@ -418,10 +476,10 @@ func (vm *VirtualMachine) execCallFunc(operands []*yarnpb.Operand) error {
 		// ok
 	case 2:
 		if functype.Out(1) != errorType {
-			return fmt.Errorf("wrong type for second return arg [got %s, want error]", functype.Out(1).Name())
+			return fmt.Errorf("%w: wrong type for second return arg [got %s, want error]", ErrFunctionArgMismatch, functype.Out(1).Name())
 		}
 	default:
-		return fmt.Errorf("unsupported number of return args [got %d, want in {0,1,2}]", functype.NumOut())
+		return fmt.Errorf("%w: unsupported number of return args [got %d, want in {0,1,2}]", ErrFunctionArgMismatch, functype.NumOut())
 	}
 
 	arg := gotArgc
@@ -437,18 +495,19 @@ func (vm *VirtualMachine) execCallFunc(operands []*yarnpb.Operand) error {
 			// last arg is reported by reflect as a slice type
 			argtype = functype.In(functype.NumIn() - 1).Elem()
 		} else {
-			// Not variadic
+			// Not variadic, or arg comes before the final variadic arg
 			argtype = functype.In(arg)
 		}
 		if param == nil {
-			// substitute param with a zero value
+			// substitute nil param with a zero value, because nil Value can't
+			// be used.
 			params[arg] = reflect.Zero(argtype)
 			continue
 		}
 
 		// typecheck paramtype against argtype
 		if paramtype := reflect.TypeOf(param); !paramtype.AssignableTo(argtype) {
-			return fmt.Errorf("value %v [type %T] not assignable to argument %d of %q [type %v]", param, param, arg, funcname, argtype)
+			return fmt.Errorf("%w: value %v [type %T] not assignable to argument %d of %q [type %v]", ErrFunctionArgMismatch, param, param, arg, funcname, argtype)
 		}
 		params[arg] = reflect.ValueOf(param)
 	}
@@ -518,7 +577,7 @@ func (vm *VirtualMachine) execStoreVariable(operands []*yarnpb.Operand) error {
 func (vm *VirtualMachine) execStop([]*yarnpb.Operand) error {
 	// Stops execution of the program.
 	// No operands.
-	return errStop
+	return Stop
 }
 
 func (vm *VirtualMachine) execRunNode([]*yarnpb.Operand) error {
@@ -533,37 +592,6 @@ func (vm *VirtualMachine) execRunNode([]*yarnpb.Operand) error {
 		return fmt.Errorf("SetNode: %w", err)
 	}
 	return nil
-}
-
-var dispatchTable = []func(*VirtualMachine, []*yarnpb.Operand) error{
-	yarnpb.Instruction_JUMP_TO:        (*VirtualMachine).execJumpTo,
-	yarnpb.Instruction_JUMP:           (*VirtualMachine).execJump,
-	yarnpb.Instruction_RUN_LINE:       (*VirtualMachine).execRunLine,
-	yarnpb.Instruction_RUN_COMMAND:    (*VirtualMachine).execRunCommand,
-	yarnpb.Instruction_ADD_OPTION:     (*VirtualMachine).execAddOption,
-	yarnpb.Instruction_SHOW_OPTIONS:   (*VirtualMachine).execShowOptions,
-	yarnpb.Instruction_PUSH_STRING:    (*VirtualMachine).execPushString,
-	yarnpb.Instruction_PUSH_FLOAT:     (*VirtualMachine).execPushFloat,
-	yarnpb.Instruction_PUSH_BOOL:      (*VirtualMachine).execPushBool,
-	yarnpb.Instruction_PUSH_NULL:      (*VirtualMachine).execPushNull,
-	yarnpb.Instruction_JUMP_IF_FALSE:  (*VirtualMachine).execJumpIfFalse,
-	yarnpb.Instruction_POP:            (*VirtualMachine).execPop,
-	yarnpb.Instruction_CALL_FUNC:      (*VirtualMachine).execCallFunc,
-	yarnpb.Instruction_PUSH_VARIABLE:  (*VirtualMachine).execPushVariable,
-	yarnpb.Instruction_STORE_VARIABLE: (*VirtualMachine).execStoreVariable,
-	yarnpb.Instruction_STOP:           (*VirtualMachine).execStop,
-	yarnpb.Instruction_RUN_NODE:       (*VirtualMachine).execRunNode,
-}
-
-func (vm *VirtualMachine) execute(inst *yarnpb.Instruction) error {
-	if inst.Opcode < 0 || int(inst.Opcode) >= len(dispatchTable) {
-		return fmt.Errorf("invalid opcode %v", inst.Opcode)
-	}
-	exec := dispatchTable[inst.Opcode]
-	if exec == nil {
-		return fmt.Errorf("invalid opcode %v", inst.Opcode)
-	}
-	return exec(vm, inst.Operands)
 }
 
 type state struct {

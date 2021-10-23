@@ -30,51 +30,30 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
-	"os"
 
 	"github.com/DrJosh9000/yarn"
-	yarnpb "github.com/DrJosh9000/yarn/bytecode"
-	"google.golang.org/protobuf/proto"
 )
 
 func main() {
 	yarncFilename := flag.String("program", "", "File name of program (e.g. Example.yarn.yarnc)")
 	csvFilename := flag.String("strings", "", "File name of string table (e.g. Example.yarn.csv)")
 	startNode := flag.String("start", "Start", "Name of the node to run")
-	langCode := flag.String("lang", "en-AU", "Language code")
+	langCode := flag.String("lang", "en-AU", "Language tag (BCP 47)")
 	flag.Parse()
 
-	yarnc, err := ioutil.ReadFile(*yarncFilename)
+	program, stringTable, err := yarn.LoadFiles(*yarncFilename, *csvFilename, *langCode)
 	if err != nil {
-		log.Fatalf("Couldn't read program file: %v", err)
-	}
-	program := new(yarnpb.Program)
-	if err := proto.Unmarshal(yarnc, program); err != nil {
-		log.Fatalf("Couldn't unmarshal program: %v", err)
+		log.Fatalf("Loading files: %v", err)
 	}
 
-	csv, err := os.Open(*csvFilename)
-	if err != nil {
-		log.Fatalf("Couldn't open string table file: %v", err)
-	}
-	defer csv.Close()
-	stringTable, err := yarn.ReadStringTable(csv, *langCode)
-	if err != nil {
-		log.Fatalf("Couldn't parse string table: %v", err)
-	}
-
-	h := &dialogueHandler{
-		stringTable: stringTable,
-	}
 	vm := &yarn.VirtualMachine{
 		Program: program,
-		Handler: h,
-		Vars:    make(yarn.MapVariableStorage),
+		Handler: &dialogueHandler{
+			stringTable: stringTable,
+		},
+		Vars: make(yarn.MapVariableStorage),
 	}
-	h.virtualMachine = vm
-
 	if err := vm.Run(*startNode); err != nil {
 		log.Printf("Yarn VM error: %v", err)
 	}
@@ -83,8 +62,9 @@ func main() {
 // dialogueHandler implements yarn.DialogueHandler by playing the lines and
 // options on the terminal.
 type dialogueHandler struct {
-	stringTable    *yarn.StringTable
-	virtualMachine *yarn.VirtualMachine
+	stringTable *yarn.StringTable
+
+	yarn.FakeDialogueHandler // implements remaining methods
 }
 
 func (h *dialogueHandler) Line(line yarn.Line) error {
@@ -120,11 +100,3 @@ func (h *dialogueHandler) Options(opts []yarn.Option) (int, error) {
 	}
 	return choice, nil
 }
-
-// Don't care about any of these:
-
-func (h *dialogueHandler) Command(string) error           { return nil }
-func (h *dialogueHandler) NodeStart(string) error         { return nil }
-func (h *dialogueHandler) PrepareForLines([]string) error { return nil }
-func (h *dialogueHandler) NodeComplete(string) error      { return nil }
-func (h *dialogueHandler) DialogueComplete() error        { return nil }

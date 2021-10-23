@@ -69,6 +69,7 @@ options, and commands to the handler.
    }
 
    // ... and also the other methods. 
+   // Alternatively you can embed yarn.FakeDialogueHandler in your handler.
    ```
 
    See `cmd/yarnrunner.go` for a complete example.
@@ -80,36 +81,27 @@ options, and commands to the handler.
    package main
    
    import (
-       "io/ioutil"
-       "os"
        "google.golang.org/protobuf/proto"
        "github.com/DrJosh9000/yarn"
        yarnpb "github.com/DrJosh9000/yarn/bytecode"
    )
    
    func main() {
-       // Load the files:
-       // (error handling omitted for brevity)
-       yarnc, _ := ioutil.ReadFile("Example.yarn.yarnc")
-       program := new(yarnpb.Program)
-       proto.Unmarshal(yarnc, program)
-       csv, _ := os.Open("Example.yarn.csv")
-       defer csv.Close()
-       stringTable, _ := yarn.ReadStringTable(csv, "en-AU")
-       // Set up the DialogueHandler and the VirtualMachine:
+       // Load the files (error handling omitted for brevity):
+       program, stringTable, _ := yarn.LoadFiles("Example.yarn.yarnc", "Example.yarn.csv", "en-AU")
+
+       // Set up your DialogueHandler and the VirtualMachine:
        myHandler := &MyHandler{
            stringTable: stringTable,
        }
        vm := &yarn.VirtualMachine{
            Program: program,
            Handler: myHandler,
-           Vars: make(yarn.MapVariableStorage), 
-           // or your own VariableStorage implementation
+           Vars: make(yarn.MapVariableStorage), // or your own VariableStorage implementation
        }
-       // Run the VirtualMachine!
-       if err := vm.Run("Start"); err != nil {
-           log.Printf("Yarn VM error: %v", err)
-       }
+       
+       // Run the VirtualMachine starting with the Start node!
+       vm.Run("Start")
    }
    ```
 
@@ -161,7 +153,7 @@ func (m *MyHandler) Line(line yarn.Line) error {
 }
 
 // Update is called on every tick by the game engine, which is a separate
-// goroutine to the one the VM is running in.
+// goroutine to the one the virtual machine is running in.
 func (m *MyHandler) Update() error {
     //...
     if m.waiting && inpututil.IsKeyJustPressed(ebiten.KeyEnter) {

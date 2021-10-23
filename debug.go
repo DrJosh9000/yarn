@@ -16,6 +16,7 @@ package yarn
 
 import (
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 
@@ -47,12 +48,10 @@ func FormatInstruction(inst *yarnpb.Instruction) string {
 	return b.String()
 }
 
-// FormatProgram prints a program in a format convenient for debugging. The
-// output is intended for human consumption only and may change between
-// incremental versions of this package.
-func FormatProgram(prog *yarnpb.Program) string {
-	sb := new(strings.Builder)
-
+// FormatProgram prints a program in a format convenient for debugging to the
+// io.Writer. The output is intended for human consumption only and may change
+// between incremental versions of this package.
+func FormatProgram(w io.Writer, prog *yarnpb.Program) error {
 	// Make all the labels line up, even across nodes
 	labelWidth := 0
 	for _, node := range prog.Nodes {
@@ -73,16 +72,33 @@ func FormatProgram(prog *yarnpb.Program) string {
 			labels[int(a)] = l
 		}
 
-		fmt.Fprintf(sb, "%s--- %s ---\n", labelSpace, name)
+		if _, err := fmt.Fprintf(w, "%s--- %s ---\n", labelSpace, name); err != nil {
+			return err
+		}
 		for n, inst := range node.Instructions {
 			if l := labels[n]; l != "" {
-				fmt.Fprintf(sb, labelFmt, l)
+				if _, err := fmt.Fprintf(w, labelFmt, l); err != nil {
+					return err
+				}
 			} else {
-				fmt.Fprint(sb, labelSpace)
+				if _, err := fmt.Fprint(w, labelSpace); err != nil {
+					return err
+				}
 			}
-			fmt.Fprintf(sb, "%06d %s\n", n, FormatInstruction(inst))
+			if _, err := fmt.Fprintf(w, "%06d %s\n", n, FormatInstruction(inst)); err != nil {
+				return err
+			}
 		}
-		fmt.Fprintln(sb)
+		if _, err := fmt.Fprintln(w); err != nil {
+			return err
+		}
 	}
+	return nil
+}
+
+// FormatProgramString
+func FormatProgramString(prog *yarnpb.Program) string {
+	var sb strings.Builder
+	FormatProgram(&sb, prog)
 	return sb.String()
 }

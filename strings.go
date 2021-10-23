@@ -18,6 +18,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"os"
 	"strconv"
 	"strings"
 
@@ -35,10 +36,26 @@ type StringTableRow struct {
 }
 
 // StringTable contains all the information from a string table, keyed by
-// string ID.
+// string ID. This can be constructed either by using ReadStringTable, or
+// manually (e.g. if you are not using Yarn Spinner CSV string tables).
 type StringTable struct {
-	lang  language.Tag
-	table map[string]StringTableRow
+	Language language.Tag
+	Table    map[string]StringTableRow
+}
+
+// LoadStringTableFile is a convenient function for loading a string table given
+// a file path.
+func LoadStringTableFile(stringTablePath, langCode string) (*StringTable, error) {
+	csv, err := os.Open(stringTablePath)
+	if err != nil {
+		return nil, fmt.Errorf("opening string table file: %w", err)
+	}
+	defer csv.Close()
+	st, err := ReadStringTable(csv, langCode)
+	if err != nil {
+		return nil, fmt.Errorf("reading string table: %w", err)
+	}
+	return st, nil
 }
 
 // ReadStringTable reads a CSV-formatted string table from the reader. It
@@ -80,15 +97,15 @@ func ReadStringTable(r io.Reader, langCode string) (*StringTable, error) {
 		}
 	}
 	return &StringTable{
-		lang:  lang,
-		table: st,
+		Language: lang,
+		Table:    st,
 	}, nil
 }
 
 // Render looks up the row corresponding to line.ID, interpolates substitutions
 // (from line.Substitutions), and applies format functions.
 func (t *StringTable) Render(line Line) (string, error) {
-	row, found := t.table[line.ID]
+	row, found := t.Table[line.ID]
 	if !found {
 		return "", fmt.Errorf("no string %q in string table", line.ID)
 	}
@@ -101,7 +118,7 @@ func (t *StringTable) Render(line Line) (string, error) {
 
 	// Apply substitutions and format functions into a string builder.
 	var sb strings.Builder
-	if err := pl.render(&sb, line.Substitutions, t.lang); err != nil {
+	if err := pl.render(&sb, line.Substitutions, t.Language); err != nil {
 		return "", err
 	}
 	return sb.String(), nil

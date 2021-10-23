@@ -15,7 +15,6 @@
 package yarn
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"strconv"
@@ -42,7 +41,7 @@ func convertToBool(x interface{}) (bool, error) {
 	case string:
 		return x != "", nil
 	default:
-		return false, fmt.Errorf("cannot convert value of type %T to bool", x)
+		return false, fmt.Errorf("%T %w to bool", x, ErrNotConvertible)
 	}
 }
 
@@ -72,7 +71,7 @@ func convertToInt(x interface{}) (int, error) {
 		if t == nil {
 			return 0, nil
 		}
-		return 0, fmt.Errorf("cannot convert value of type %T to int", x)
+		return 0, fmt.Errorf("%T %w to int", x, ErrNotConvertible)
 	}
 }
 
@@ -94,11 +93,11 @@ func convertToString(x interface{}) string {
 // operandToInt is a helper for turning a number value into an int.
 func operandToInt(op *yarnpb.Operand) (int, error) {
 	if op == nil {
-		return 0, errors.New("nil operand")
+		return 0, ErrNilOperand
 	}
 	f, ok := op.Value.(*yarnpb.Operand_FloatValue)
 	if !ok {
-		return 0, fmt.Errorf("wrong operand type [%T != Operand_FloatValue]", op.Value)
+		return 0, fmt.Errorf("%w for operand [%T != Operand_FloatValue]", ErrWrongType, op.Value)
 	}
 	return int(f.FloatValue), nil
 }
