@@ -43,8 +43,9 @@ type StringTable struct {
 	Table    map[string]StringTableRow
 }
 
-// LoadStringTableFile is a convenient function for loading a string table given
-// a file path.
+// LoadStringTableFile is a convenient function for loading a CSV string table
+// given a file path. It assumes the first row is a header. langCode must be a
+// valid BCP 47 language tag.
 func LoadStringTableFile(stringTablePath, langCode string) (*StringTable, error) {
 	csv, err := os.Open(stringTablePath)
 	if err != nil {
@@ -58,9 +59,8 @@ func LoadStringTableFile(stringTablePath, langCode string) (*StringTable, error)
 	return st, nil
 }
 
-// ReadStringTable reads a CSV-formatted string table from the reader. It
-// assumes the first row is a header. langCode must be a valid BCP 47 language
-// tag.
+// ReadStringTable reads a CSV string table from the reader. It assumes the
+// first row is a header. langCode must be a valid BCP 47 language tag.
 func ReadStringTable(r io.Reader, langCode string) (*StringTable, error) {
 	lang, err := language.Parse(langCode)
 	if err != nil {

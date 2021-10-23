@@ -32,16 +32,16 @@ type Option struct {
 	// The line that should be presented for this option.
 	Line Line
 
-	// Name of the node to run if this option is selected.
+	// Name of the node that will run next, if this option is selected.
 	DestinationNode string
 
-	// Indicates whether the player should be permitted to select the option,
-	// e.g. for an option that the player _could_ have taken if they had
-	// satisfied some prerequisite earlier on.
+	// Indicates whether the player should be permitted to select the option.
+	// This is false for options that the player _could_ have taken if they had
+	// satisfied some prerequisite earlier in the game.
 	IsAvailable bool
 }
 
-// DialogueHandler receives events from the VM.
+// DialogueHandler receives events from the virtual machine.
 type DialogueHandler interface {
 	// NodeStart is called when a node has begun executing. It is passed the
 	// name of the node.
