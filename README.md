@@ -72,8 +72,6 @@ options, and commands to the handler.
    // Alternatively you can embed yarn.FakeDialogueHandler in your handler.
    ```
 
-   See `cmd/yarnrunner.go` for a complete example.
-
 3. Load the two files, your `DialogueHandler`, and a `VariableStorage` into a
    `VirtualMachine`, and then pass the name of the first node to `Run`:
 
@@ -104,6 +102,8 @@ options, and commands to the handler.
        vm.Run("Start")
    }
    ```
+
+See `cmd/yarnrunner.go` for a complete example.
 
 ## Usage notes
 
