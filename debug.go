@@ -96,7 +96,7 @@ func FormatProgram(w io.Writer, prog *yarnpb.Program) error {
 	return nil
 }
 
-// FormatProgramString
+// FormatProgramString prints the whole program into a string.
 func FormatProgramString(prog *yarnpb.Program) string {
 	var sb strings.Builder
 	FormatProgram(&sb, prog)

@@ -78,11 +78,7 @@ options, and commands to the handler.
    ```go
    package main
    
-   import (
-       "google.golang.org/protobuf/proto"
-       "github.com/DrJosh9000/yarn"
-       yarnpb "github.com/DrJosh9000/yarn/bytecode"
-   )
+   import "github.com/DrJosh9000/yarn"
    
    func main() {
        // Load the files (error handling omitted for brevity):
