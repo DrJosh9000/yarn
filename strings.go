@@ -129,17 +129,18 @@ var (
 	// nested functions, but... hey I get nested functions for ~free!
 	lineLexer = lexer.MustStateful(lexer.Rules{
 		"Root": {
-			{Name: "Escaped", Pattern: `\\[{}\[\]"]`, Action: nil},
-			{Name: "Func", Pattern: `\[`, Action: lexer.Push("Func")},
+			{Name: "Escaped", Pattern: `\\[\{\}\[\]"\\]`, Action: nil},
+			{Name: "Markup", Pattern: `\[`, Action: lexer.Push("Markup")},
 			{Name: "Subst", Pattern: `{`, Action: lexer.Push("Subst")},
-			{Name: "Char", Pattern: `%|[^{\[%"]+`, Action: nil},
+			{Name: "Char", Pattern: `[%\{\[\\]|[^%\{\["\\]+`, Action: nil},
 		},
-		"Func": {
+		"Markup": {
 			{Name: "Whitespace", Pattern: `\s+`, Action: nil},
+			{Name: "Slash", Pattern: `/`, Action: nil},
 			{Name: "Ident", Pattern: `\w+`, Action: nil},
 			{Name: "Equals", Pattern: `=`, Action: nil},
 			{Name: "String", Pattern: `"`, Action: lexer.Push("String")},
-			{Name: "FuncEnd", Pattern: `\]`, Action: lexer.Pop()},
+			{Name: "MarkupEnd", Pattern: `\]`, Action: lexer.Pop()},
 		},
 		"Subst": {
 			{Name: "Index", Pattern: `\d+`, Action: nil},
@@ -173,10 +174,10 @@ func (p *parsedString) render(sb *strings.Builder, substs []string, lang languag
 }
 
 type fragment struct {
-	Escaped string       `parser:"@Escaped"`
-	Func    *parsedFunc  `parser:"| '[' @@ ']'"`
-	Subst   *parsedSubst `parser:"| '{' @@ '}'"`
-	Text    string       `parser:"| @Char"`
+	Escaped string        `parser:"@Escaped"`
+	Markup  *parsedMarkup `parser:"| Markup @@ MarkupEnd"`
+	Subst   string        `parser:"| Subst @Index SubstEnd"`
+	Text    string        `parser:"| @Char"`
 }
 
 func (s *fragment) render(sb *strings.Builder, substs []string, lang language.Tag) error {
@@ -186,20 +187,26 @@ func (s *fragment) render(sb *strings.Builder, substs []string, lang language.Ta
 	switch {
 	case s.Escaped != "":
 		sb.WriteString(s.Escaped[1:])
-	case s.Func != nil:
-		return s.Func.render(sb, substs, lang)
-	case s.Subst != nil:
-		return s.Subst.render(sb, substs)
+	case s.Markup != nil:
+		return s.Markup.render(sb, substs, lang)
+	case s.Subst != "":
+		n, err := strconv.Atoi(s.Subst)
+		if err != nil || n < 0 || n >= len(substs) {
+			sb.WriteString("{" + s.Subst + "}")
+			break
+		}
+		sb.WriteString(substs[n])
 	default:
 		sb.WriteString(s.Text)
 	}
 	return nil
 }
 
-type parsedFunc struct {
+type parsedMarkup struct {
+	Slash string        `parser:"@Slash?"`
 	Name  string        `parser:"@Ident"`
-	Input *parsedString `parser:"\"\\\"\" @@ \"\\\"\""`
-	Opts  []*parsedOpt  `parser:"@@+"`
+	Input *parsedString `parser:"( String @@ StringEnd )?"`
+	Opts  []*parsedOpt  `parser:"@@*"`
 }
 
 // maps plural.Form values to identifiers used in Yarn Spinner plural and
@@ -213,13 +220,16 @@ var formKeyTable = []string{
 	plural.Many:  "many",
 }
 
-func (f *parsedFunc) render(sb *strings.Builder, substs []string, lang language.Tag) error {
+func (f *parsedMarkup) render(sb *strings.Builder, substs []string, lang language.Tag) error {
 	// input is a fragment that needs assembling
-	var inb strings.Builder
-	if err := f.Input.render(&inb, substs, lang); err != nil {
-		return err
+	var in string
+	if f.Input != nil {
+		var inb strings.Builder
+		if err := f.Input.render(&inb, substs, lang); err != nil {
+			return err
+		}
+		in = inb.String()
 	}
-	in := inb.String()
 
 	// function name determines lookup key
 	switch f.Name {
@@ -251,13 +261,15 @@ func (f *parsedFunc) render(sb *strings.Builder, substs []string, lang language.
 		return f.findAndRender(sb, substs, in, formKeyTable[form], lang)
 
 	default:
-		return fmt.Errorf("unknown format function %q", f.Name)
+		// Something else - remove the markup tag from the output for now.
+		// TODO: Implement attributed strings
+		return nil
 	}
 }
 
 // findAndRender searches f.Opts for the option matching the key, and then
 // renders that option to sb.
-func (f *parsedFunc) findAndRender(sb *strings.Builder, substs []string, input, key string, lang language.Tag) error {
+func (f *parsedMarkup) findAndRender(sb *strings.Builder, substs []string, input, key string, lang language.Tag) error {
 	for _, opt := range f.Opts {
 		if opt.Key == key {
 			return opt.render(sb, substs, input, lang)
@@ -266,25 +278,9 @@ func (f *parsedFunc) findAndRender(sb *strings.Builder, substs []string, input, 
 	return fmt.Errorf("key %q not found in %#v", key, f.Opts)
 }
 
-type parsedSubst struct {
-	Index string `parser:"@Index"`
-}
-
-func (s *parsedSubst) render(sb *strings.Builder, substs []string) error {
-	n, err := strconv.Atoi(s.Index)
-	if err != nil {
-		return err
-	}
-	if n < 0 || n >= len(substs) {
-		return fmt.Errorf("substitution index %d out of range [0, %d)", n, len(substs))
-	}
-	sb.WriteString(substs[n])
-	return nil
-}
-
 type parsedOpt struct {
-	Key   string        `parser:"@Ident '='"`
-	Value *parsedString `parser:"\"\\\"\" @@ \"\\\"\""`
+	Key   string        `parser:"@Ident Equals"`
+	Value *parsedString `parser:"String @@ StringEnd"`
 }
 
 func (o *parsedOpt) render(sb *strings.Builder, substs []string, input string, lang language.Tag) error {
