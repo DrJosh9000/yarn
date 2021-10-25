@@ -210,11 +210,11 @@ func (s *fragment) render(sb *strings.Builder, substs []string, lang language.Ta
 // parsedMarkup is used for both format functions (select, plural, ordinal) and
 // BBCode-esque markup tags ([b]Bold!?[/b]).
 type parsedMarkup struct {
-	OpeningSlash string        `parser:"@Slash?"`
-	Name         string        `parser:"@Ident?"`
-	Input        *parsedString `parser:"( String @@ StringEnd )?"`
-	Props        []*parsedProp `parser:"@@*"`
-	ClosingSlash string        `parser:"@Slash?"`
+	OpeningSlash string        `parser:"@Slash?"`                  // indicates closing tag of a pair
+	Name         string        `parser:"@Ident?"`                  // used for all except close-all tag [/]
+	Input        *parsedString `parser:"( String @@ StringEnd )?"` // used for format funcs
+	Props        []*parsedProp `parser:"@@*"`                      // key="value" properties
+	ClosingSlash string        `parser:"@Slash?"`                  // indicates self-closing tag
 }
 
 // maps plural.Form values to identifiers used in Yarn Spinner plural and
