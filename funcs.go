@@ -41,7 +41,7 @@ func defaultFuncMap() FuncMap {
 		"LessThan":             func(x, y float32) bool { return x < y },
 		"LessThanOrEqualTo":    func(x, y float32) bool { return x <= y },
 		"NotEqualTo":           func(x, y interface{}) bool { return x != y },
-		// numbers are truthy, hence boolean operators are generic
+		// Boolean operators are generic because other types have truthiness
 		"Or":         funcOr,
 		"And":        funcAnd,
 		"Xor":        funcXor,

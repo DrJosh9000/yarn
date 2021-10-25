@@ -160,6 +160,8 @@ var (
 	)
 )
 
+// parsedString is used for both entire lines and the contents of double-quoted
+// strings.
 type parsedString struct {
 	Fragments []*fragment `parser:"@@*"`
 }
@@ -173,6 +175,9 @@ func (p *parsedString) render(sb *strings.Builder, substs []string, lang languag
 	return nil
 }
 
+// fragment is part of a string or line. The parser breaks it into pieces so
+// that special pieces (escape sequences, markup, substitutions, and %) can be
+// processed in a special way.
 type fragment struct {
 	Escaped string        `parser:"@Escaped"`
 	Markup  *parsedMarkup `parser:"| Markup @@ MarkupEnd"`
@@ -202,11 +207,14 @@ func (s *fragment) render(sb *strings.Builder, substs []string, lang language.Ta
 	return nil
 }
 
+// parsedMarkup is used for both format functions (select, plural, ordinal) and
+// BBCode-esque markup tags ([b]Bold!?[/b]).
 type parsedMarkup struct {
-	Slash string        `parser:"@Slash?"`
-	Name  string        `parser:"@Ident"`
-	Input *parsedString `parser:"( String @@ StringEnd )?"`
-	Opts  []*parsedOpt  `parser:"@@*"`
+	OpeningSlash string        `parser:"@Slash?"`
+	Name         string        `parser:"@Ident?"`
+	Input        *parsedString `parser:"( String @@ StringEnd )?"`
+	Props        []*parsedProp `parser:"@@*"`
+	ClosingSlash string        `parser:"@Slash?"`
 }
 
 // maps plural.Form values to identifiers used in Yarn Spinner plural and
@@ -267,26 +275,28 @@ func (f *parsedMarkup) render(sb *strings.Builder, substs []string, lang languag
 	}
 }
 
-// findAndRender searches f.Opts for the option matching the key, and then
+// findAndRender searches f.Props for the option matching the key, and then
 // renders that option to sb.
 func (f *parsedMarkup) findAndRender(sb *strings.Builder, substs []string, input, key string, lang language.Tag) error {
-	for _, opt := range f.Opts {
+	for _, opt := range f.Props {
 		if opt.Key == key {
 			return opt.render(sb, substs, input, lang)
 		}
 	}
-	return fmt.Errorf("key %q not found in %#v", key, f.Opts)
+	return fmt.Errorf("key %q not found in %#v", key, f.Props)
 }
 
-type parsedOpt struct {
+// parsedProp is used for key="value" properties of format funcs and markup
+// tags.
+type parsedProp struct {
 	Key   string        `parser:"@Ident Equals"`
 	Value *parsedString `parser:"String @@ StringEnd"`
 }
 
-func (o *parsedOpt) render(sb *strings.Builder, substs []string, input string, lang language.Tag) error {
-	// Options have an additional token that needs to be processed specially
-	// (%), so don't just call o.Value.render.
-	for _, v := range o.Value.Fragments {
+func (p *parsedProp) render(sb *strings.Builder, substs []string, input string, lang language.Tag) error {
+	// Property values have an additional token that needs to be processed
+	// specially (%).
+	for _, v := range p.Value.Fragments {
 		if v.Text == "%" {
 			sb.WriteString(input)
 			continue
