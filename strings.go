@@ -132,7 +132,7 @@ var (
 			{Name: "Escaped", Pattern: `\\[\{\}\[\]"\\]`, Action: nil},
 			{Name: "Markup", Pattern: `\[`, Action: lexer.Push("Markup")},
 			{Name: "Subst", Pattern: `{`, Action: lexer.Push("Subst")},
-			{Name: "Char", Pattern: `[%\{\[\\]|[^%\{\["\\]+`, Action: nil},
+			{Name: "Char", Pattern: `[%\{\["\\]|[^%\{\["\\]+`, Action: nil},
 		},
 		"Markup": {
 			{Name: "Whitespace", Pattern: `\s+`, Action: nil},
@@ -147,8 +147,8 @@ var (
 			{Name: "SubstEnd", Pattern: `}`, Action: lexer.Pop()},
 		},
 		"String": {
-			lexer.Include("Root"),
 			{Name: "StringEnd", Pattern: `"`, Action: lexer.Pop()},
+			lexer.Include("Root"),
 		},
 	})
 
