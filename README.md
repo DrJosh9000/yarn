@@ -103,14 +103,29 @@ See `cmd/yarnrunner.go` for a complete example.
 
 ## Usage notes
 
-Note that using a Yarn Spinner 1.0 compiler will result in some unusual
-behaviour when compiling Yarn Spinner 2.0 source. For example, `<<jump .. >>`
-will be compiled as a command that your `DialogueHandler` must implement.
-Your implementation of `Command` may safely call `SetNode` on the VM.
+Note that using an earlier Yarn Spinner compiler will result in some unusual
+behaviour when compiling Yarn files with newer features. For example, with v1.0
+`<<jump ...>>` may be compiled as a command. Your implementation of `Command`
+may implement `jump` by calling the `SetNode` VM method.
+
+If you need the tags for a node, you can read these from the `Node` protobuf
+message directly. Source text of a `rawText` node can be looked up manually:
+
+```go
+prog, st, _ := yarn.LoadFiles("testdata/Example.yarn.yarnc", "testdata/Example.yarn.csv", "en")
+node := prog.Nodes["LearnMore"]
+// Tags for the LearnMore node:
+fmt.Println(node.Tags)
+// Source text string ID:
+fmt.Println(node.SourceTextStringID)
+// Source text:
+fmt.Println(st.Table[node.SourceTextStringID].Text)
+```
 
 In a typical game, `vm.Run` would happen in a separate goroutine. To avoid the
-VM delivering all the lines and options at once, your `DialogueHandler` is
-allowed to block execution - for example, on a channel operation:
+VM delivering all the lines, options, and commands at once, your
+`DialogueHandler` implementation is allowed to block execution of the VM
+goroutine - for example, using a channel operation:
 
 ```go
 type MyHandler struct {

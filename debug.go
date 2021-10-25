@@ -62,7 +62,7 @@ func FormatProgram(w io.Writer, prog *yarnpb.Program) error {
 		}
 	}
 	labelFmt := "% " + strconv.Itoa(labelWidth) + "s: "
-	labelSpace := strings.Repeat(" ", labelWidth+2)
+	noLabel := strings.Repeat(" ", labelWidth+2)
 
 	// Now print the program into the string builder
 	for name, node := range prog.Nodes {
@@ -72,8 +72,13 @@ func FormatProgram(w io.Writer, prog *yarnpb.Program) error {
 			labels[int(a)] = l
 		}
 
-		if _, err := fmt.Fprintf(w, "%s--- %s ---\n", labelSpace, name); err != nil {
+		if _, err := fmt.Fprintf(w, "%s--- %s tags:%v---\n", noLabel, name, node.Tags); err != nil {
 			return err
+		}
+		if node.SourceTextStringID != "" {
+			if _, err := fmt.Fprintf(w, "%sSourceTextStringID: %q\n", noLabel, node.SourceTextStringID); err != nil {
+				return err
+			}
 		}
 		for n, inst := range node.Instructions {
 			if l := labels[n]; l != "" {
@@ -81,7 +86,7 @@ func FormatProgram(w io.Writer, prog *yarnpb.Program) error {
 					return err
 				}
 			} else {
-				if _, err := fmt.Fprint(w, labelSpace); err != nil {
+				if _, err := fmt.Fprint(w, noLabel); err != nil {
 					return err
 				}
 			}
