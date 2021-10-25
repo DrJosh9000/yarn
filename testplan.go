@@ -113,7 +113,7 @@ func (p *TestPlan) Line(line Line) error {
 	if err != nil {
 		return err
 	}
-	if text != step.Contents {
+	if text.String() != step.Contents {
 		return fmt.Errorf("testplan got line %q, want %q", text, step.Contents)
 	}
 	return nil
@@ -135,7 +135,7 @@ func (p *TestPlan) Options(opts []Option) (int, error) {
 		if err != nil {
 			return 0, err
 		}
-		if text != step.Contents {
+		if text.String() != step.Contents {
 			return 0, fmt.Errorf("testplan got option line %q, want %q", text, step.Contents)
 		}
 	}

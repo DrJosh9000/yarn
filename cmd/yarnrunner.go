@@ -72,6 +72,7 @@ func (h *dialogueHandler) Line(line yarn.Line) error {
 	if err != nil {
 		return err
 	}
+	// TODO: Turn [b] attribute into ^[[1m, [u] into ^[[4m, etc
 	fmt.Println(text)
 	fmt.Print("(Press ENTER to continue)")
 	fmt.Scanln()

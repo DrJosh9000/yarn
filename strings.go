@@ -103,25 +103,26 @@ func ReadStringTable(r io.Reader, langCode string) (*StringTable, error) {
 }
 
 // Render looks up the row corresponding to line.ID, interpolates substitutions
-// (from line.Substitutions), and applies format functions.
-func (t *StringTable) Render(line Line) (string, error) {
+// (from line.Substitutions), applies format functions, and processes style
+// tags into attributes.
+func (t *StringTable) Render(line Line) (*AttributedString, error) {
 	row, found := t.Table[line.ID]
 	if !found {
-		return "", fmt.Errorf("no string %q in string table", line.ID)
+		return nil, fmt.Errorf("no string %q in string table", line.ID)
 	}
 	// Parse the line according to the grammar below.
 	filename := fmt.Sprintf("%s:%d", row.File, row.LineNumber)
 	pl := new(parsedString)
 	if err := lineParser.ParseString(filename, row.Text, pl); err != nil {
-		return "", err
+		return nil, err
 	}
 
 	// Apply substitutions and format functions into a string builder.
-	var sb strings.Builder
-	if err := pl.render(&sb, line.Substitutions, t.Language); err != nil {
-		return "", err
+	var asb attStrBuilder
+	if err := pl.render(&asb, line.Substitutions, t.Language); err != nil {
+		return nil, err
 	}
-	return sb.String(), nil
+	return asb.attStr(), nil
 }
 
 var (
@@ -166,9 +167,9 @@ type parsedString struct {
 	Fragments []*fragment `parser:"@@*"`
 }
 
-func (p *parsedString) render(sb *strings.Builder, substs []string, lang language.Tag) error {
+func (p *parsedString) render(asb *attStrBuilder, substs []string, lang language.Tag) error {
 	for _, f := range p.Fragments {
-		if err := f.render(sb, substs, lang); err != nil {
+		if err := f.render(asb, substs, lang); err != nil {
 			return err
 		}
 	}
@@ -185,24 +186,24 @@ type fragment struct {
 	Text    string        `parser:"| @Char"`
 }
 
-func (s *fragment) render(sb *strings.Builder, substs []string, lang language.Tag) error {
+func (s *fragment) render(asb *attStrBuilder, substs []string, lang language.Tag) error {
 	if s == nil {
 		return nil
 	}
 	switch {
 	case s.Escaped != "":
-		sb.WriteString(s.Escaped[1:])
+		asb.WriteString(s.Escaped[1:])
 	case s.Markup != nil:
-		return s.Markup.render(sb, substs, lang)
+		return s.Markup.render(asb, substs, lang)
 	case s.Subst != "":
 		n, err := strconv.Atoi(s.Subst)
 		if err != nil || n < 0 || n >= len(substs) {
-			sb.WriteString("{" + s.Subst + "}")
+			asb.WriteString("{" + s.Subst + "}")
 			break
 		}
-		sb.WriteString(substs[n])
+		asb.WriteString(substs[n])
 	default:
-		sb.WriteString(s.Text)
+		asb.WriteString(s.Text)
 	}
 	return nil
 }
@@ -228,11 +229,11 @@ var formKeyTable = []string{
 	plural.Many:  "many",
 }
 
-func (f *parsedMarkup) render(sb *strings.Builder, substs []string, lang language.Tag) error {
+func (f *parsedMarkup) render(asb *attStrBuilder, substs []string, lang language.Tag) error {
 	// input is a fragment that needs assembling
 	var in string
 	if f.Input != nil {
-		var inb strings.Builder
+		var inb attStrBuilder
 		if err := f.Input.render(&inb, substs, lang); err != nil {
 			return err
 		}
@@ -244,7 +245,7 @@ func (f *parsedMarkup) render(sb *strings.Builder, substs []string, lang languag
 	case "select":
 		// input chooses which value to interpolate
 		// (input == lookup key)
-		return f.findAndRender(sb, substs, in, in, lang)
+		return f.findAndRender(asb, substs, in, in, lang)
 
 	case "plural":
 		ops, err := cldr.NewOperands(in)
@@ -255,7 +256,7 @@ func (f *parsedMarkup) render(sb *strings.Builder, substs []string, lang languag
 		if int(form) > len(formKeyTable) {
 			return fmt.Errorf("plural form %v not supported", form)
 		}
-		return f.findAndRender(sb, substs, in, formKeyTable[form], lang)
+		return f.findAndRender(asb, substs, in, formKeyTable[form], lang)
 
 	case "ordinal":
 		ops, err := cldr.NewOperands(in)
@@ -266,21 +267,46 @@ func (f *parsedMarkup) render(sb *strings.Builder, substs []string, lang languag
 		if int(form) > len(formKeyTable) {
 			return fmt.Errorf("plural form %v not supported", form)
 		}
-		return f.findAndRender(sb, substs, in, formKeyTable[form], lang)
+		return f.findAndRender(asb, substs, in, formKeyTable[form], lang)
 
 	default:
-		// Something else - remove the markup tag from the output for now.
-		// TODO: Implement attributed strings
+		// Something else. Style tag I hope.
+		switch {
+		case f.OpeningSlash == "/" && f.Name == "":
+			// Close-all tag
+			asb.closeAll()
+
+		case f.OpeningSlash == "/":
+			// Close tag
+			if err := asb.closeTag(f.Name); err != nil {
+				return err
+			}
+
+		case f.ClosingSlash == "/":
+			// Self-closing tag
+			if err := asb.openTag(f.Name, f.Props, substs, lang); err != nil {
+				return err
+			}
+			if err := asb.closeTag(f.Name); err != nil {
+				return err
+			}
+
+		default:
+			// Open tag
+			if err := asb.openTag(f.Name, f.Props, substs, lang); err != nil {
+				return err
+			}
+		}
 		return nil
 	}
 }
 
 // findAndRender searches f.Props for the option matching the key, and then
 // renders that option to sb.
-func (f *parsedMarkup) findAndRender(sb *strings.Builder, substs []string, input, key string, lang language.Tag) error {
+func (f *parsedMarkup) findAndRender(asb *attStrBuilder, substs []string, input, key string, lang language.Tag) error {
 	for _, opt := range f.Props {
 		if opt.Key == key {
-			return opt.render(sb, substs, input, lang)
+			return opt.render(asb, substs, input, lang)
 		}
 	}
 	return fmt.Errorf("key %q not found in %#v", key, f.Props)
@@ -293,17 +319,101 @@ type parsedProp struct {
 	Value *parsedString `parser:"String @@ StringEnd"`
 }
 
-func (p *parsedProp) render(sb *strings.Builder, substs []string, input string, lang language.Tag) error {
+func (p *parsedProp) render(asb *attStrBuilder, substs []string, input string, lang language.Tag) error {
 	// Property values have an additional token that needs to be processed
 	// specially (%).
 	for _, v := range p.Value.Fragments {
 		if v.Text == "%" {
-			sb.WriteString(input)
+			asb.WriteString(input)
 			continue
 		}
-		if err := v.render(sb, substs, lang); err != nil {
+		if err := v.render(asb, substs, lang); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// AttributedString is a string with additional attributes, such as presentation
+// or styling information, that apply to the whole string or substrings.
+type AttributedString struct {
+	Str        string
+	Attributes []*Attribute
+}
+
+func (s *AttributedString) String() string { return s.Str }
+
+// Attribute describes a range within a string with additional information
+// provided by markup tags. Start and End specify the range in bytes. Name is
+// the tag name, and Props contains any additional key="value" tag properties.
+type Attribute struct {
+	Start, End int
+	Name       string
+	Props      map[string]string
+}
+
+type attStrBuilder struct {
+	strings.Builder
+	attribs []*Attribute
+	open    map[string][]*Attribute // lazily created (by openTag)
+}
+
+func (b *attStrBuilder) attStr() *AttributedString {
+	return &AttributedString{
+		Str:        b.Builder.String(),
+		Attributes: b.attribs,
+	}
+}
+
+func (b *attStrBuilder) openTag(name string, props []*parsedProp, substs []string, lang language.Tag) error {
+	// Render each prop value into its own string, and put into a map
+	m := make(map[string]string)
+	for _, prop := range props {
+		var vsb attStrBuilder
+		if err := prop.Value.render(&vsb, substs, lang); err != nil {
+			return err
+		}
+		// So ... attributed strings *could* have attributes that have
+		// properties that have values that are attributed strings ...
+		// Haha lol nope.
+		m[prop.Key] = vsb.String()
+	}
+	a := &Attribute{
+		Start: b.Builder.Len(),
+		Name:  name,
+		Props: m,
+	}
+	if b.open == nil {
+		b.open = map[string][]*Attribute{name: {a}}
+		return nil
+	}
+	b.open[name] = append(b.open[name], a)
+	return nil
+}
+
+func (b *attStrBuilder) closeTag(name string) error {
+	if b.open == nil {
+		return fmt.Errorf("tag %q not open", name)
+	}
+	as := b.open[name]
+	l := len(as)
+	if l == 0 {
+		return fmt.Errorf("tag %q not open", name)
+	}
+	// Close the last one
+	a, as := as[l-1], as[:l-1]
+	b.open[name] = as
+	a.End = b.Builder.Len()
+	b.attribs = append(b.attribs, a)
+	return nil
+}
+
+func (b *attStrBuilder) closeAll() {
+	for name, as := range b.open {
+		for _, a := range as {
+			a.End = b.Builder.Len()
+			b.attribs = append(b.attribs, a)
+		}
+		delete(b.open, name)
+	}
 }
