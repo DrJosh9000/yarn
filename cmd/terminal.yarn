@@ -1,0 +1,44 @@
+title: Start
+---
+Hi! Welcome to the yarnrunner.go demo.
+Here's an example of [b]bold[/b]!
+Ooh, what about [u]underline[/u]?
+Heh, here's a fun one!
+But I won't do it unless you ask for it...
+Would you like to see [b]blink[/b]?
+-> Yeah, wreck my eyeballs!
+    Here we go! [blink]BLINK, BLONK[/blink]
+    ... wait, did that work?
+    -> Yeah
+        Heck yeah!
+    -> Nah
+        Maybe you need a real VT100.
+-> No thank you.
+    I respect your choice.
+What else do we have here?
+[lowint]Low intensity?[/lowint]
+[reverse]Reverse?[/reverse]
+[invisible]Invisible?[/invisible]
+... that last one was "invisible", if that wasn't visible.
+[strike]Strikethrough?[/strike]
+Uh... ooooh, I found some [b]gemstones[/b]!
+Which one would you like to take?
+-> The [red]red[/red] gem
+    [red]Firey![/]
+-> The [yellow]yellow[/yellow] gem
+    [yellow]Shiny![/]
+-> The [green]green[/green] gem
+    [green]Groovy![/]
+-> The [cyan]cyan[/cyan] gem
+    [cyan]Glowy![/]
+-> The [blue]blue[/blue] gem
+    [blue]Cool![/]
+-> The [purple]purple[/purple] gem
+    [purple]High-frequency![/]
+-> The [grey]gray[/grey] gem
+    [b]First of all how [u]dare[/u] you[/b]
+-> The [white]white[/white] gem
+    [white]6500K![/white]
+That's the end! Enjoy the gemstone!
+Before disembarking, please remember: always use escape sequences [b][reverse][red]r[/red][yellow]e[/yellow][green]s[/green][cyan]p[/cyan][blue]o[/blue][purple]n[/purple][red]s[/red][yellow]i[/yellow][green]b[/green][cyan]l[/cyan][blue]y[/]
+===

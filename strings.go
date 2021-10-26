@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -342,6 +343,48 @@ type AttributedString struct {
 }
 
 func (s *AttributedString) String() string { return s.Str }
+
+// ScanAttribEvents calls visit with each Attribute twice: once at the start of
+// the attribute, and once at the end. The visit calls will happen in order, but
+// not necessarily the same order as they were originally presented in the
+// source string.
+//
+// For example, an attributed string built from the input
+// `[a]Here's A![/a][b]Here's B! [c]With C now[/c][/b]`
+// could be visited in the order
+// (`a`, start), (`b`, start), (`a`, end), (`c`, start), (`b`, end), (`c`, end).
+func (s *AttributedString) ScanAttribEvents(visit func(att *Attribute, start bool)) {
+	// Make a reference
+	starts := s.Attributes
+	// Sort starts by start
+	sort.Slice(starts, func(i, j int) bool {
+		return starts[i].Start < starts[j].Start
+	})
+	// Make a *copy*
+	ends := append([]*Attribute(nil), s.Attributes...)
+	// Sort ends by end
+	sort.Slice(ends, func(i, j int) bool {
+		return ends[i].End < ends[j].End
+	})
+	// March through starts and ends, and do visiting.
+	// If the attributed string is well-formed (i.e. start <= end for every
+	// attribute), all the starts must be visited before all the ends, so really
+	// the loop only has to check i < len(starts).
+	// But check j < len(ends) anwyay to avoid a panic in case it is malformed.
+	i, j := 0, 0
+	for i < len(starts) && j < len(ends) {
+		if starts[i].Start <= ends[j].End {
+			visit(starts[i], true)
+			i++
+		} else {
+			visit(ends[j], false)
+			j++
+		}
+	}
+	for ; j < len(ends); j++ {
+		visit(ends[j], false)
+	}
+}
 
 // Attribute describes a range within a string with additional information
 // provided by markup tags. Start and End specify the range in bytes. Name is

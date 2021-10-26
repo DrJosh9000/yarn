@@ -17,14 +17,16 @@
 
 // The yarnrunner binary runs a yarnc+string table combo as a "text game" on
 // the terminal.
-// The "example" build tag is used to prevent this being installed to go/bin
-// if you use the go get command.
 //
 // Quick usage from the root of the repo:
 //
 //    go run -tags example cmd/yarnrunner.go \
 //        --program=testdata/Example.yarn.yarnc \
 //        --strings=testdata/Example.yarn.csv
+//
+// The "example" build tag is used to prevent this being installed to ~/go/bin
+// if you use the go get command. If for some reason you want to install it to
+// your ~/go/bin, use `go install -tags example cmd/yarnrunner.go` or similar.
 package main
 
 import (
@@ -72,8 +74,7 @@ func (h *dialogueHandler) Line(line yarn.Line) error {
 	if err != nil {
 		return err
 	}
-	// TODO: Turn [b] attribute into ^[[1m, [u] into ^[[4m, etc
-	fmt.Println(text)
+	fancyPrintln(text)
 	fmt.Print("(Press ENTER to continue)")
 	fmt.Scanln()
 	// This next string is VT100 for "move to the first column, go up a line,
@@ -89,7 +90,8 @@ func (h *dialogueHandler) Options(opts []yarn.Option) (int, error) {
 		if err != nil {
 			return 0, err
 		}
-		fmt.Printf("%d: %s\n", opt.ID, text)
+		fmt.Printf("%d: ", opt.ID)
+		fancyPrintln(text)
 	}
 	var choice int
 	for {
@@ -100,4 +102,66 @@ func (h *dialogueHandler) Options(opts []yarn.Option) (int, error) {
 		break
 	}
 	return choice, nil
+}
+
+// fancyPrintln prints an attributed string with ANSI escape sequences that
+// apply formatting, corresponding to the BBCode-style tags from the original
+// yarn file.
+//
+// This is needed because fmt.Println(text) would only print the string, not the
+// escape sequences needed to apply bold, underline, colour, etc.
+func fancyPrintln(text *yarn.AttributedString) {
+	cursor := 0
+	open := make(map[*yarn.Attribute]struct{})
+	text.ScanAttribEvents(func(att *yarn.Attribute, start bool) {
+		if start {
+			if att.Start > cursor {
+				fmt.Print(text.Str[cursor:att.Start])
+				cursor = att.Start
+			}
+			// Print the escape code matching the tag name
+			fmt.Print(escapes[att.Name])
+			// Record it as open
+			open[att] = struct{}{}
+			return
+		}
+		// end
+		if att.End > cursor {
+			fmt.Print(text.Str[cursor:att.End])
+			cursor = att.End
+		}
+		// Clear all character attributes
+		fmt.Print("\033[m")
+		// Remove the one that just ended
+		delete(open, att)
+		// Replay all the other attributes that are still open
+		for a := range open {
+			fmt.Print(escapes[a.Name])
+		}
+	})
+	// Print remainder
+	fmt.Println(text.Str[cursor:])
+}
+
+// Maps style tags to ANSI escape sequences. Printing these changes the style or
+// colour. See https://en.wikipedia.org/wiki/ANSI_escape_code.
+var escapes = map[string]string{
+	"b":         "\033[1m",
+	"bold":      "\033[1m",
+	"lowint":    "\033[2m",
+	"u":         "\033[4m",
+	"underline": "\033[4m",
+	"blink":     "\033[5m",
+	"reverse":   "\033[7m",
+	"invisible": "\033[8m",
+	"strike":    "\033[9m",
+	"red":       "\033[31m",
+	"green":     "\033[32m",
+	"yellow":    "\033[33m",
+	"blue":      "\033[34m",
+	"purple":    "\033[35m",
+	"cyan":      "\033[36m",
+	"gray":      "\033[37m",
+	"grey":      "\033[37m",
+	"white":     "\033[97m",
 }
