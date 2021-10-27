@@ -153,7 +153,7 @@ func (m *MyHandler) setWaiting(w bool) {
 // Line is called from the goroutine running VirtualMachine.Run.
 func (m *MyHandler) Line(line yarn.Line) error {
     text, _ := m.stringTable.Render(line)
-    m.dialogueDisplay.Show(text+"\n\nPress ENTER to continue")
+    m.dialogueDisplay.Show(text.Str+"\n\nPress ENTER to continue")
     
     // Go into waiting-for-player-input state
     m.setWaiting(true)
