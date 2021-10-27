@@ -346,7 +346,7 @@ func (lr *lineRenderer) renderFragment(s *fragment) error {
 	case s.Escaped != "":
 		lr.WriteString(s.Escaped[1:])
 	case s.Markup != nil:
-		return s.Markup.renderMarkup(lr)
+		return lr.renderMarkup(s.Markup)
 	case s.Subst != "":
 		n, err := strconv.Atoi(s.Subst)
 		if err != nil || n < 0 || n >= len(lr.substs) {
@@ -371,8 +371,8 @@ var formKeyTable = []string{
 	plural.Many:  "many",
 }
 
-func (f *parsedMarkup) renderMarkup(lr *lineRenderer) error {
-	// input is a fragment that needs assembling
+func (lr *lineRenderer) renderMarkup(f *parsedMarkup) error {
+	// f.Input is itself a fragment that needs assembling
 	var in string
 	if f.Input != nil {
 		inb := &lineRenderer{
@@ -385,7 +385,6 @@ func (f *parsedMarkup) renderMarkup(lr *lineRenderer) error {
 		in = inb.String()
 	}
 
-	// function name determines lookup key
 	switch f.Name {
 	case "select":
 		// input chooses which value to interpolate
