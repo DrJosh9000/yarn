@@ -56,7 +56,7 @@ func defaultFuncMap() FuncMap {
 		"Xor":                  func(x, y bool) bool { return x != y },
 		"Not":                  func(x bool) bool { return !x },
 		"UnaryMinus":           func(x float32) float32 { return -x },
-		// bare Add can't implicitly convert, because it does something
+		// Add can't use implicit conversion, because it does something
 		// different depending on the argument types.
 		"Add":      funcAdd,
 		"Minus":    func(x, y float32) float32 { return x - y },
@@ -95,18 +95,44 @@ func funcAdd(x, y interface{}) (interface{}, error) {
 	if y == nil {
 		return x, nil
 	}
-	switch xt := x.(type) {
-	case string:
+	// Try strings first
+	if xt, ok := x.(string); ok {
 		return xt + ConvertToString(y), nil
-	case float32:
-		switch yt := y.(type) {
-		case float32:
-			return xt + yt, nil
-		case string:
-			return ConvertToString(x) + yt, nil
-		default:
-			return nil, fmt.Errorf("mismatching types [first arg float32, second arg %T]", y)
-		}
 	}
-	return false, fmt.Errorf("unsupported type [%T ∉ {nil,float32,string}]", x)
+	if yt, ok := y.(string); ok {
+		return ConvertToString(x) + yt, nil
+	}
+	// numeric, probably
+	switch xt := x.(type) {
+	case bool:
+		// upconvert both to numbers
+		xtt, err := ConvertToFloat32(x)
+		if err != nil {
+			return nil, err
+		}
+		yt, err := ConvertToFloat32(y)
+		if err != nil {
+			return nil, err
+		}
+		return xtt + yt, nil
+	case float32:
+		yt, err := ConvertToFloat32(y)
+		if err != nil {
+			return nil, err
+		}
+		return xt + yt, nil
+	case float64:
+		yt, err := ConvertToFloat64(y)
+		if err != nil {
+			return nil, err
+		}
+		return xt + yt, nil
+	case int:
+		yt, err := ConvertToInt(y)
+		if err != nil {
+			return nil, err
+		}
+		return xt + yt, nil
+	}
+	return false, fmt.Errorf("unsupported type [%T ∉ {nil,bool,float32,float64,int,string}]", x)
 }
