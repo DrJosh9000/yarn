@@ -1,34 +1,37 @@
 id,text,file,node,lineNumber
-ShortcutOptions-Start-0,Option 1,ShortcutOptions,Start,9
-ShortcutOptions-Start-1,Option 2,ShortcutOptions,Start,18
-ShortcutOptions-Start-2,Option 3,ShortcutOptions,Start,20
-ShortcutOptions-Start-3,This line should appear.,ShortcutOptions,Start,11
-ShortcutOptions-Start-4,Sub Option 1,ShortcutOptions,Start,12
-ShortcutOptions-Start-5,Sub Option 2,ShortcutOptions,Start,16
-ShortcutOptions-Start-6,Sub Option 3,ShortcutOptions,Start,17
-ShortcutOptions-Start-7,This line should also appear.,ShortcutOptions,Start,14
-ShortcutOptions-Start-8,This line should not appear.,ShortcutOptions,Start,19
-ShortcutOptions-Start-9,This line should not appear.,ShortcutOptions,Start,21
-ShortcutOptions-Start-10,Bea: line text,ShortcutOptions,Start,25
-ShortcutOptions-Start-11,option1,ShortcutOptions,Start,26
-ShortcutOptions-Start-12,option2,ShortcutOptions,Start,27
-ShortcutOptions-Start-13,Bea: line text2,ShortcutOptions,Start,28
-ShortcutOptions-Start-14,Bea: indented line text,ShortcutOptions,Start,31
-ShortcutOptions-Start-15,indented option1,ShortcutOptions,Start,32
-ShortcutOptions-Start-16,indented option2,ShortcutOptions,Start,33
-ShortcutOptions-Start-17,Bea: indented line text2,ShortcutOptions,Start,34
-ShortcutOptions-Start-18,Bea: line text,ShortcutOptions,Start,37
-ShortcutOptions-Start-19,indented option1 following unindented line,ShortcutOptions,Start,38
-ShortcutOptions-Start-20,indented option2 following unindented line,ShortcutOptions,Start,39
-ShortcutOptions-Start-21,option2.1,ShortcutOptions,Start,40
-ShortcutOptions-Start-22,option2.2,ShortcutOptions,Start,41
-ShortcutOptions-Start-23,option2.3,ShortcutOptions,Start,42
-ShortcutOptions-Start-24,option2.4,ShortcutOptions,Start,43
-line:0e8a7ce,Option A,ShortcutOptions,Start,48
-line:0405c66,Option B,ShortcutOptions,Start,49
-ShortcutOptions-Start-25,(Break up the commands),ShortcutOptions,Start,51
-line:0e8a7cd,Option A,ShortcutOptions,Start,54
-line:0405c67,Option B,ShortcutOptions,Start,55
-ShortcutOptions-Start-26,(Break up the commands),ShortcutOptions,Start,57
-ShortcutOptions-Start-27,Option1,ShortcutOptions,Start,61
-ShortcutOptions-Start-28,Option2,ShortcutOptions,Start,63
+line:/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn-Start-0,Option 1,/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn,Start,10
+line:/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn-Start-1,This line should appear.,/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn,Start,12
+line:/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn-Start-2,Sub Option 1,/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn,Start,13
+line:/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn-Start-3,This line should also appear.,/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn,Start,15
+line:/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn-Start-4,Sub Option 2,/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn,Start,17
+line:/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn-Start-5,Sub Option 3,/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn,Start,18
+line:/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn-Start-6,Option 2,/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn,Start,19
+line:/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn-Start-7,This line should not appear.,/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn,Start,20
+line:/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn-Start-8,Option 3,/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn,Start,21
+line:/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn-Start-9,This line should not appear.,/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn,Start,22
+line:/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn-Start-10,Bea: line text,/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn,Start,26
+line:/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn-Start-11,option1,/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn,Start,27
+line:/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn-Start-12,option2,/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn,Start,28
+line:/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn-Start-13,Bea: line text2,/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn,Start,29
+line:/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn-Start-14,Bea: indented line text,/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn,Start,32
+line:/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn-Start-15,indented option1,/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn,Start,33
+line:/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn-Start-16,indented option2,/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn,Start,34
+line:/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn-Start-17,Bea: indented line text2,/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn,Start,35
+line:/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn-Start-18,Bea: line text,/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn,Start,38
+line:/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn-Start-19,indented option1 following unindented line,/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn,Start,39
+line:/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn-Start-20,indented option2 following unindented line,/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn,Start,40
+line:/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn-Start-21,option2.1,/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn,Start,41
+line:/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn-Start-22,option2.2,/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn,Start,42
+line:/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn-Start-23,option2.3,/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn,Start,43
+line:/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn-Start-24,option2.4,/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn,Start,44
+line:/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn-Start-25,A,/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn,Start,47
+line:/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn-Start-26,B,/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn,Start,48
+line:/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn-Start-27,(Break up the options),/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn,Start,50
+line:0e8a7ce,Option A,/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn,Start,55
+line:0405c66,Option B,/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn,Start,56
+line:/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn-Start-30,(Break up the options),/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn,Start,58
+line:0e8a7cd,Option A,/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn,Start,61
+line:0405c67,Option B,/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn,Start,62
+line:/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn-Start-33,(Break up the options),/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn,Start,64
+line:/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn-Start-34,Option1,/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn,Start,68
+line:/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn-Start-35,Option2,/Users/josh/Code/yarn/testdata/ShortcutOptions.yarn,Start,70

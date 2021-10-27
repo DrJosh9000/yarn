@@ -80,8 +80,17 @@ const (
 // called.
 const Stop = virtualMachineError("stop")
 
-// Used to typecheck the second return arg of functions in FuncMap.
-var errorType = reflect.TypeOf((*error)(nil)).Elem()
+var (
+	// Used to typecheck the second return arg of functions in FuncMap.
+	errorType = reflect.TypeOf((*error)(nil)).Elem()
+
+	// Used to switch on function argument type to pick a conversion.
+	boolType    = reflect.TypeOf(true)
+	float32Type = reflect.TypeOf(float32(0))
+	float64Type = reflect.TypeOf(float64(0))
+	intType     = reflect.TypeOf(int(0))
+	stringType  = reflect.TypeOf("")
+)
 
 // Used to implement the sentinel errors as consts instead of vars.
 type virtualMachineError string
@@ -406,7 +415,7 @@ func (vm *VirtualMachine) execJumpIfFalse(operands []*yarnpb.Operand) error {
 	if err != nil {
 		return fmt.Errorf("peek: %w", err)
 	}
-	b, err := convertToBool(x)
+	b, err := ConvertToBool(x)
 	if err != nil {
 		return fmt.Errorf("convertToBool: %w", err)
 	}
@@ -456,7 +465,7 @@ func (vm *VirtualMachine) execCallFunc(operands []*yarnpb.Operand) error {
 	if err != nil {
 		return fmt.Errorf("pop: %w", err)
 	}
-	gotArgc, err := convertToInt(gotx)
+	gotArgc, err := ConvertToInt(gotx)
 	if err != nil {
 		return fmt.Errorf("convertToInt: %w", err)
 	}
@@ -509,7 +518,38 @@ func (vm *VirtualMachine) execCallFunc(operands []*yarnpb.Operand) error {
 
 		// typecheck paramtype against argtype
 		if paramtype := reflect.TypeOf(param); !paramtype.AssignableTo(argtype) {
-			return fmt.Errorf("%w: value %v [type %T] not assignable to argument %d of %q [type %v]", ErrFunctionArgMismatch, param, param, arg, funcname, argtype)
+			// attempt conversion to the type expected by the function
+			switch argtype {
+			// no case for interface{} because everything is assignable to interface{}
+			case stringType:
+				param = ConvertToString(param)
+			case float32Type:
+				p, err := ConvertToFloat32(param)
+				if err != nil {
+					return err
+				}
+				param = p
+			case float64Type:
+				p, err := ConvertToFloat64(param)
+				if err != nil {
+					return err
+				}
+				param = p
+			case intType:
+				p, err := ConvertToInt(param)
+				if err != nil {
+					return err
+				}
+				param = p
+			case boolType:
+				p, err := ConvertToBool(param)
+				if err != nil {
+					return err
+				}
+				param = p
+			default:
+				return fmt.Errorf("%w: value %v [type %T] not assignable or convertible to argument %d of %q [type %v]", ErrFunctionArgMismatch, param, param, arg, funcname, argtype)
+			}
 		}
 		params[arg] = reflect.ValueOf(param)
 	}
@@ -656,7 +696,7 @@ func (s *state) popNStrings(n int) ([]string, error) {
 	rem := len(s.stack) - n
 	ss := make([]string, n)
 	for i, x := range s.stack[rem:] {
-		ss[i] = convertToString(x)
+		ss[i] = ConvertToString(x)
 	}
 	s.stack = s.stack[:rem]
 	return ss, nil

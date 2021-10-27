@@ -18,9 +18,18 @@ import (
 	"fmt"
 )
 
-// FuncMap maps function names to implementations. Each function must return 0,
-// 1, or 2 values, and if 2 are returned, the latter must be type `error`.
-// It is similar to the text/template FuncMap.
+// FuncMap maps function names to implementations.  It is similar to the
+// text/template FuncMap.
+//
+// Each function must return either 0, 1, or 2 values, and if 2 are returned,
+// the latter must be type `error`.
+//
+// If the arguments being passed by the program are not assignable to an
+// argument, and the argument has type bool, int, float32, float64, or string,
+// then a conversion is attempted by the VM. For example, if the stack has the
+// values ("3", true, 2) on top, CALL_FUNC with "Number.Add" (see below) would
+// cause Number.Add's implementation to be called with (3.0, 1.0) (the 2 is the
+// argument count).
 type FuncMap map[string]interface{}
 
 // merge merges fm into m and returns m.
@@ -34,66 +43,49 @@ func (m FuncMap) merge(fm FuncMap) FuncMap {
 // defaultFuncMap returns a FuncMap with the standard Yarn Spinner operators.
 func defaultFuncMap() FuncMap {
 	return FuncMap{
+		// --- Non-method funcs (old skool) ---
 		"None":                 func(x interface{}) interface{} { return x },
 		"EqualTo":              func(x, y interface{}) bool { return x == y },
+		"NotEqualTo":           func(x, y interface{}) bool { return x != y },
 		"GreaterThan":          func(x, y float32) bool { return x > y },
 		"GreaterThanOrEqualTo": func(x, y float32) bool { return x >= y },
 		"LessThan":             func(x, y float32) bool { return x < y },
 		"LessThanOrEqualTo":    func(x, y float32) bool { return x <= y },
-		"NotEqualTo":           func(x, y interface{}) bool { return x != y },
-		// Boolean operators are generic because other types have truthiness
-		"Or":         funcOr,
-		"And":        funcAnd,
-		"Xor":        funcXor,
-		"Not":        funcNot,
-		"UnaryMinus": func(x float32) float32 { return -x },
-		"Add":        funcAdd,
-		"Minus":      func(x, y float32) float32 { return x - y },
-		"Multiply":   func(x, y float32) float32 { return x * y },
-		"Divide":     func(x, y float32) float32 { return x / y },
-		"Modulo":     func(x, y float32) float32 { return float32(int(x) % int(y)) },
-	}
-}
+		"Or":                   func(x, y bool) bool { return x || y },
+		"And":                  func(x, y bool) bool { return x && y },
+		"Xor":                  func(x, y bool) bool { return x != y },
+		"Not":                  func(x bool) bool { return !x },
+		"UnaryMinus":           func(x float32) float32 { return -x },
+		// bare Add can't implicitly convert, because it does something
+		// different depending on the argument types.
+		"Add":      funcAdd,
+		"Minus":    func(x, y float32) float32 { return x - y },
+		"Multiply": func(x, y float32) float32 { return x * y },
+		"Divide":   func(x, y float32) float32 { return x / y },
+		"Modulo":   func(x, y int) float32 { return float32(x % y) },
 
-func funcOr(x, y interface{}) (bool, error) {
-	xt, err := convertToBool(x)
-	if err != nil {
-		return false, fmt.Errorf("first arg: %w", err)
-	}
-	yt, err := convertToBool(x)
-	if err != nil {
-		return false, fmt.Errorf("second arg: %w", err)
-	}
-	return xt || yt, nil
-}
-
-func funcAnd(x, y interface{}) (bool, error) {
-	xt, err := convertToBool(x)
-	if err != nil {
-		return false, fmt.Errorf("first arg: %w", err)
-	}
-	yt, err := convertToBool(x)
-	if err != nil {
-		return false, fmt.Errorf("second arg: %w", err)
-	}
-	return xt && yt, nil
-}
-
-func funcXor(x, y interface{}) (bool, error) {
-	xt, err := convertToBool(x)
-	if err != nil {
-		return false, fmt.Errorf("first arg: %w", err)
-	}
-	yt, err := convertToBool(x)
-	if err != nil {
-		return false, fmt.Errorf("second arg: %w", err)
-	}
-	return xt != yt, nil
-}
-
-func funcNot(x interface{}) (bool, error) {
-	t, err := convertToBool(x)
-	return !t, err
+		// --- Method funcs (2.0) ---
+		"Bool.EqualTo":                func(x, y bool) bool { return x == y },
+		"Bool.NotEqualTo":             func(x, y bool) bool { return x != y },
+		"Bool.Or":                     func(x, y bool) bool { return x || y },
+		"Bool.And":                    func(x, y bool) bool { return x && y },
+		"Bool.Xor":                    func(x, y bool) bool { return x != y },
+		"Bool.Not":                    func(x bool) bool { return !x },
+		"Number.EqualTo":              func(x, y float32) bool { return x == y },
+		"Number.NotEqualTo":           func(x, y float32) bool { return x != y },
+		"Number.Add":                  func(x, y float32) float32 { return x + y },
+		"Number.Minus":                func(x, y float32) float32 { return x - y },
+		"Number.Multiply":             func(x, y float32) float32 { return x * y },
+		"Number.Divide":               func(x, y float32) float32 { return x / y },
+		"Number.Modulo":               func(x, y int) float32 { return float32(x % y) },
+		"Number.UnaryMinus":           func(x float32) float32 { return -x },
+		"Number.GreaterThan":          func(x, y float32) bool { return x > y },
+		"Number.GreaterThanOrEqualTo": func(x, y float32) bool { return x >= y },
+		"Number.LessThan":             func(x, y float32) bool { return x < y },
+		"Number.LessThanOrEqualTo":    func(x, y float32) bool { return x <= y },
+		"String.EqualTo":              func(x, y string) bool { return x == y },
+		"String.NotEqualTo":           func(x, y string) bool { return x != y },
+		"String.Add":                  func(x, y string) string { return x + y }}
 }
 
 func funcAdd(x, y interface{}) (interface{}, error) {
@@ -105,13 +97,13 @@ func funcAdd(x, y interface{}) (interface{}, error) {
 	}
 	switch xt := x.(type) {
 	case string:
-		return xt + convertToString(y), nil
+		return xt + ConvertToString(y), nil
 	case float32:
 		switch yt := y.(type) {
 		case float32:
 			return xt + yt, nil
 		case string:
-			return convertToString(x) + yt, nil
+			return ConvertToString(x) + yt, nil
 		default:
 			return nil, fmt.Errorf("mismatching types [first arg float32, second arg %T]", y)
 		}

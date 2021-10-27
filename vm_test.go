@@ -52,7 +52,7 @@ func TestAllTestPlans(t *testing.T) {
 				FuncMap: FuncMap{
 					// Used by various
 					"assert": func(x interface{}) error {
-						t, err := convertToBool(x)
+						t, err := ConvertToBool(x)
 						if err != nil {
 							return err
 						}

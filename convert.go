@@ -22,10 +22,9 @@ import (
 	yarnpb "github.com/DrJosh9000/yarn/bytecode"
 )
 
-// convertToBool attempts conversion of the standard Yarn Spinner VM types
-// (bool, number, string, null) to bool, in the same way Yarn Spinner does it
-// (see AsBool in Value.cs).
-func convertToBool(x interface{}) (bool, error) {
+// ConvertToBool attempts conversion of the standard Yarn Spinner VM types
+// (bool, number, string, null) to bool.
+func ConvertToBool(x interface{}) (bool, error) {
 	if x == nil {
 		return false, nil
 	}
@@ -45,11 +44,9 @@ func convertToBool(x interface{}) (bool, error) {
 	}
 }
 
-// convertToInt attempts conversion of an arbitrary value to int. Right now it's
-// only used by the VM to count function arguments. But it works in a way that
-// should be compatible with how Yarn Spinner does it (see AsNumber in
-// Value.cs).
-func convertToInt(x interface{}) (int, error) {
+// ConvertToInt attempts conversion of the standard Yarn Spinner VM types to
+// (bool, number, string, null) to int.
+func ConvertToInt(x interface{}) (int, error) {
 	if x == nil {
 		return 0, nil
 	}
@@ -75,9 +72,69 @@ func convertToInt(x interface{}) (int, error) {
 	}
 }
 
-// convertToString converts a value to a string, in a way that matches what Yarn
+// ConvertToFloat32 attempts conversion of the standard Yarn Spinner VM types
+// (bool, number, string, null) to a float32.
+func ConvertToFloat32(x interface{}) (float32, error) {
+	if x == nil {
+		return 0, nil
+	}
+	switch t := x.(type) {
+	case bool:
+		if t {
+			return 1, nil
+		}
+		return 0, nil
+	case float32:
+		return t, nil
+	case float64:
+		return float32(t), nil
+	case int:
+		return float32(t), nil
+	case string:
+		y, err := strconv.ParseFloat(t, 32)
+		if err != nil {
+			return 0, err
+		}
+		return float32(y), nil
+	default:
+		if t == nil {
+			return 0, nil
+		}
+		return 0, fmt.Errorf("%T %w to float32", x, ErrNotConvertible)
+	}
+}
+
+// ConvertToFloat64 attempts conversion of the standard Yarn Spinner VM types
+// (bool, number, string, null) to a float64.
+func ConvertToFloat64(x interface{}) (float64, error) {
+	if x == nil {
+		return 0, nil
+	}
+	switch t := x.(type) {
+	case bool:
+		if t {
+			return 1, nil
+		}
+		return 0, nil
+	case float32:
+		return float64(t), nil
+	case float64:
+		return t, nil
+	case int:
+		return float64(t), nil
+	case string:
+		return strconv.ParseFloat(t, 64)
+	default:
+		if t == nil {
+			return 0, nil
+		}
+		return 0, fmt.Errorf("%T %w to float64", x, ErrNotConvertible)
+	}
+}
+
+// ConvertToString converts a value to a string, in a way that matches what Yarn
 // Spinner does. nil becomes "null", and booleans are title-cased.
-func convertToString(x interface{}) string {
+func ConvertToString(x interface{}) string {
 	if x == nil {
 		return "null"
 	}

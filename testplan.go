@@ -135,8 +135,15 @@ func (p *TestPlan) Options(opts []Option) (int, error) {
 		if err != nil {
 			return 0, err
 		}
+		disabled := strings.HasSuffix(step.Contents, " [disabled]")
+		if disabled {
+			step.Contents = strings.TrimSuffix(step.Contents, " [disabled]")
+		}
 		if text.String() != step.Contents {
 			return 0, fmt.Errorf("testplan got option line %q, want %q", text, step.Contents)
+		}
+		if got, want := opt.IsAvailable, !disabled; got != want {
+			return 0, fmt.Errorf("testplan got option %q IsAvailable %t, want %t", text, got, want)
 		}
 	}
 	// Next step should be a select
