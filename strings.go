@@ -119,11 +119,14 @@ func (t *StringTable) Render(line Line) (*AttributedString, error) {
 	}
 
 	// Apply substitutions and format functions into a string builder.
-	var asb attStrBuilder
-	if err := pl.render(&asb, line.Substitutions, t.Language); err != nil {
+	lr := &lineRenderer{
+		substs: line.Substitutions,
+		lang:   t.Language,
+	}
+	if err := lr.renderString(pl); err != nil {
 		return nil, err
 	}
-	return asb.attStr(), nil
+	return lr.attStr(), nil
 }
 
 var (
@@ -168,15 +171,6 @@ type parsedString struct {
 	Fragments []*fragment `parser:"@@*"`
 }
 
-func (p *parsedString) render(asb *attStrBuilder, substs []string, lang language.Tag) error {
-	for _, f := range p.Fragments {
-		if err := f.render(asb, substs, lang); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // fragment is part of a string or line. The parser breaks it into pieces so
 // that special pieces (escape sequences, markup, substitutions, and %) can be
 // processed in a special way.
@@ -185,28 +179,6 @@ type fragment struct {
 	Markup  *parsedMarkup `parser:"| Markup @@ MarkupEnd"`
 	Subst   string        `parser:"| Subst @Index SubstEnd"`
 	Text    string        `parser:"| @Char"`
-}
-
-func (s *fragment) render(asb *attStrBuilder, substs []string, lang language.Tag) error {
-	if s == nil {
-		return nil
-	}
-	switch {
-	case s.Escaped != "":
-		asb.WriteString(s.Escaped[1:])
-	case s.Markup != nil:
-		return s.Markup.render(asb, substs, lang)
-	case s.Subst != "":
-		n, err := strconv.Atoi(s.Subst)
-		if err != nil || n < 0 || n >= len(substs) {
-			asb.WriteString("{" + s.Subst + "}")
-			break
-		}
-		asb.WriteString(substs[n])
-	default:
-		asb.WriteString(s.Text)
-	}
-	return nil
 }
 
 // parsedMarkup is used for both format functions (select, plural, ordinal) and
@@ -219,120 +191,11 @@ type parsedMarkup struct {
 	ClosingSlash string        `parser:"@Slash?"`                  // indicates self-closing tag
 }
 
-// maps plural.Form values to identifiers used in Yarn Spinner plural and
-// ordinal format functions
-var formKeyTable = []string{
-	plural.Other: "other",
-	plural.Zero:  "zero",
-	plural.One:   "one",
-	plural.Two:   "two",
-	plural.Few:   "few",
-	plural.Many:  "many",
-}
-
-func (f *parsedMarkup) render(asb *attStrBuilder, substs []string, lang language.Tag) error {
-	// input is a fragment that needs assembling
-	var in string
-	if f.Input != nil {
-		var inb attStrBuilder
-		if err := f.Input.render(&inb, substs, lang); err != nil {
-			return err
-		}
-		in = inb.String()
-	}
-
-	// function name determines lookup key
-	switch f.Name {
-	case "select":
-		// input chooses which value to interpolate
-		// (input == lookup key)
-		return f.findAndRender(asb, substs, in, in, lang)
-
-	case "plural":
-		ops, err := cldr.NewOperands(in)
-		if err != nil {
-			return err
-		}
-		form := plural.Cardinal.MatchPlural(lang, int(ops.I), int(ops.V), int(ops.W), int(ops.F), int(ops.T))
-		if int(form) > len(formKeyTable) {
-			return fmt.Errorf("plural form %v not supported", form)
-		}
-		return f.findAndRender(asb, substs, in, formKeyTable[form], lang)
-
-	case "ordinal":
-		ops, err := cldr.NewOperands(in)
-		if err != nil {
-			return err
-		}
-		form := plural.Ordinal.MatchPlural(lang, int(ops.I), int(ops.V), int(ops.W), int(ops.F), int(ops.T))
-		if int(form) > len(formKeyTable) {
-			return fmt.Errorf("plural form %v not supported", form)
-		}
-		return f.findAndRender(asb, substs, in, formKeyTable[form], lang)
-
-	default:
-		// Something else. Style tag I hope.
-		switch {
-		case f.OpeningSlash == "/" && f.Name == "":
-			// Close-all tag
-			asb.closeAll()
-
-		case f.OpeningSlash == "/":
-			// Close tag
-			if err := asb.closeTag(f.Name); err != nil {
-				return err
-			}
-
-		case f.ClosingSlash == "/":
-			// Self-closing tag
-			if err := asb.openTag(f.Name, f.Props, substs, lang); err != nil {
-				return err
-			}
-			if err := asb.closeTag(f.Name); err != nil {
-				return err
-			}
-
-		default:
-			// Open tag
-			if err := asb.openTag(f.Name, f.Props, substs, lang); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-}
-
-// findAndRender searches f.Props for the option matching the key, and then
-// renders that option to sb.
-func (f *parsedMarkup) findAndRender(asb *attStrBuilder, substs []string, input, key string, lang language.Tag) error {
-	for _, opt := range f.Props {
-		if opt.Key == key {
-			return opt.render(asb, substs, input, lang)
-		}
-	}
-	return fmt.Errorf("key %q not found in %#v", key, f.Props)
-}
-
 // parsedProp is used for key="value" properties of format funcs and markup
 // tags.
 type parsedProp struct {
 	Key   string        `parser:"@Ident Equals"`
 	Value *parsedString `parser:"String @@ StringEnd"`
-}
-
-func (p *parsedProp) render(asb *attStrBuilder, substs []string, input string, lang language.Tag) error {
-	// Property values have an additional token that needs to be processed
-	// specially (%).
-	for _, v := range p.Value.Fragments {
-		if v.Text == "%" {
-			asb.WriteString(input)
-			continue
-		}
-		if err := v.render(asb, substs, lang); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // AttributedString is a string with additional attributes, such as presentation
@@ -395,25 +258,30 @@ type Attribute struct {
 	Props      map[string]string
 }
 
-type attStrBuilder struct {
+type lineRenderer struct {
 	strings.Builder
 	attribs []*Attribute
 	open    map[string][]*Attribute // lazily created (by openTag)
+	substs  []string
+	lang    language.Tag
 }
 
-func (b *attStrBuilder) attStr() *AttributedString {
+func (b *lineRenderer) attStr() *AttributedString {
 	return &AttributedString{
 		Str:        b.Builder.String(),
 		Attributes: b.attribs,
 	}
 }
 
-func (b *attStrBuilder) openTag(name string, props []*parsedProp, substs []string, lang language.Tag) error {
+func (b *lineRenderer) openTag(name string, props []*parsedProp) error {
 	// Render each prop value into its own string, and put into a map
 	m := make(map[string]string)
 	for _, prop := range props {
-		var vsb attStrBuilder
-		if err := prop.Value.render(&vsb, substs, lang); err != nil {
+		vsb := &lineRenderer{
+			substs: b.substs,
+			lang:   b.lang,
+		}
+		if err := vsb.renderString(prop.Value); err != nil {
 			return err
 		}
 		// So ... attributed strings *could* have attributes that have
@@ -434,7 +302,7 @@ func (b *attStrBuilder) openTag(name string, props []*parsedProp, substs []strin
 	return nil
 }
 
-func (b *attStrBuilder) closeTag(name string) error {
+func (b *lineRenderer) closeTag(name string) error {
 	if b.open == nil {
 		return fmt.Errorf("tag %q not open", name)
 	}
@@ -451,7 +319,7 @@ func (b *attStrBuilder) closeTag(name string) error {
 	return nil
 }
 
-func (b *attStrBuilder) closeAll() {
+func (b *lineRenderer) closeAll() {
 	for name, as := range b.open {
 		for _, a := range as {
 			a.End = b.Builder.Len()
@@ -459,4 +327,147 @@ func (b *attStrBuilder) closeAll() {
 		}
 		delete(b.open, name)
 	}
+}
+
+func (lr *lineRenderer) renderString(p *parsedString) error {
+	for _, f := range p.Fragments {
+		if err := lr.renderFragment(f); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (lr *lineRenderer) renderFragment(s *fragment) error {
+	if s == nil {
+		return nil
+	}
+	switch {
+	case s.Escaped != "":
+		lr.WriteString(s.Escaped[1:])
+	case s.Markup != nil:
+		return s.Markup.renderMarkup(lr)
+	case s.Subst != "":
+		n, err := strconv.Atoi(s.Subst)
+		if err != nil || n < 0 || n >= len(lr.substs) {
+			lr.WriteString("{" + s.Subst + "}")
+			break
+		}
+		lr.WriteString(lr.substs[n])
+	default:
+		lr.WriteString(s.Text)
+	}
+	return nil
+}
+
+// maps plural.Form values to identifiers used in Yarn Spinner plural and
+// ordinal format functions
+var formKeyTable = []string{
+	plural.Other: "other",
+	plural.Zero:  "zero",
+	plural.One:   "one",
+	plural.Two:   "two",
+	plural.Few:   "few",
+	plural.Many:  "many",
+}
+
+func (f *parsedMarkup) renderMarkup(lr *lineRenderer) error {
+	// input is a fragment that needs assembling
+	var in string
+	if f.Input != nil {
+		inb := &lineRenderer{
+			substs: lr.substs,
+			lang:   lr.lang,
+		}
+		if err := inb.renderString(f.Input); err != nil {
+			return err
+		}
+		in = inb.String()
+	}
+
+	// function name determines lookup key
+	switch f.Name {
+	case "select":
+		// input chooses which value to interpolate
+		// (input == lookup key)
+		return lr.renderPropValueForKey(f, in, in)
+
+	case "plural":
+		ops, err := cldr.NewOperands(in)
+		if err != nil {
+			return err
+		}
+		form := plural.Cardinal.MatchPlural(lr.lang, int(ops.I), int(ops.V), int(ops.W), int(ops.F), int(ops.T))
+		if int(form) > len(formKeyTable) {
+			return fmt.Errorf("plural form %v not supported", form)
+		}
+		return lr.renderPropValueForKey(f, in, formKeyTable[form])
+
+	case "ordinal":
+		ops, err := cldr.NewOperands(in)
+		if err != nil {
+			return err
+		}
+		form := plural.Ordinal.MatchPlural(lr.lang, int(ops.I), int(ops.V), int(ops.W), int(ops.F), int(ops.T))
+		if int(form) > len(formKeyTable) {
+			return fmt.Errorf("plural form %v not supported", form)
+		}
+		return lr.renderPropValueForKey(f, in, formKeyTable[form])
+
+	default:
+		// Something else. Style tag I hope.
+		switch {
+		case f.OpeningSlash == "/" && f.Name == "":
+			// Close-all tag
+			lr.closeAll()
+
+		case f.OpeningSlash == "/":
+			// Close tag
+			if err := lr.closeTag(f.Name); err != nil {
+				return err
+			}
+
+		case f.ClosingSlash == "/":
+			// Self-closing tag
+			if err := lr.openTag(f.Name, f.Props); err != nil {
+				return err
+			}
+			if err := lr.closeTag(f.Name); err != nil {
+				return err
+			}
+
+		default:
+			// Open tag
+			if err := lr.openTag(f.Name, f.Props); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+}
+
+// renderPropValueForKey searches f.Props for the option matching the key, and
+// then renders that option.
+func (lr *lineRenderer) renderPropValueForKey(f *parsedMarkup, input, key string) error {
+	for _, opt := range f.Props {
+		if opt.Key == key {
+			return lr.renderPropValue(opt, input)
+		}
+	}
+	return fmt.Errorf("key %q not found in %#v", key, f.Props)
+}
+
+func (lr *lineRenderer) renderPropValue(p *parsedProp, input string) error {
+	// Property values have an additional token that needs to be processed
+	// specially (%).
+	for _, v := range p.Value.Fragments {
+		if v.Text == "%" {
+			lr.WriteString(input)
+			continue
+		}
+		if err := lr.renderFragment(v); err != nil {
+			return err
+		}
+	}
+	return nil
 }
