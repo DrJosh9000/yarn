@@ -144,6 +144,7 @@ var (
 			{Name: "Slash", Pattern: `/`, Action: nil},
 			{Name: "Ident", Pattern: `\w+`, Action: nil},
 			{Name: "Equals", Pattern: `=`, Action: nil},
+			{Name: "Subst", Pattern: `{`, Action: lexer.Push("Subst")},
 			{Name: "String", Pattern: `"`, Action: lexer.Push("String")},
 			{Name: "MarkupEnd", Pattern: `\]`, Action: lexer.Pop()},
 		},
@@ -184,11 +185,12 @@ type fragment struct {
 // parsedMarkup is used for both format functions (select, plural, ordinal) and
 // BBCode-esque markup tags ([b]Bold!?[/b]).
 type parsedMarkup struct {
-	OpeningSlash string        `parser:"@Slash?"`                  // indicates closing tag of a pair
-	Name         string        `parser:"@Ident?"`                  // used for all except close-all tag [/]
-	Input        *parsedString `parser:"( String @@ StringEnd )?"` // used for format funcs
-	Props        []*parsedProp `parser:"@@*"`                      // key="value" properties
-	ClosingSlash string        `parser:"@Slash?"`                  // indicates self-closing tag
+	OpeningSlash string        `parser:"@Slash?"`                      // indicates closing tag of a pair
+	Name         string        `parser:"@Ident?"`                      // used for all except close-all tag [/]
+	InputString  *parsedString `parser:"( String @@ StringEnd "`       // used for format funcs (older compiler wrapped the token in quotes)
+	InputSubst   string        `parser:"  | Subst @Index SubstEnd )?"` // used for format funcs (newer compiler did not wrap the token in quotes)
+	Props        []*parsedProp `parser:"@@*"`                          // key="value" properties
+	ClosingSlash string        `parser:"@Slash?"`                      // indicates self-closing tag
 }
 
 // parsedProp is used for key="value" properties of format funcs and markup
@@ -372,17 +374,27 @@ var formKeyTable = []string{
 }
 
 func (lr *lineRenderer) renderMarkup(f *parsedMarkup) error {
-	// f.Input is itself a fragment that needs assembling
+	// InputString is itself a fragment (usually just containing a subst token)
+	// that needs assembling
+	// InputSubst is a subst token that needs to be looked up.
 	var in string
-	if f.Input != nil {
+	switch {
+	case f.InputString != nil:
 		inb := &lineRenderer{
 			substs: lr.substs,
 			lang:   lr.lang,
 		}
-		if err := inb.renderString(f.Input); err != nil {
+		if err := inb.renderString(f.InputString); err != nil {
 			return err
 		}
 		in = inb.String()
+	case f.InputSubst != "":
+		n, err := strconv.Atoi(f.InputSubst)
+		if err != nil || n < 0 || n >= len(lr.substs) {
+			// uhhhhhh
+			break
+		}
+		in = lr.substs[n]
 	}
 
 	switch f.Name {

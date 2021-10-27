@@ -1,19 +1,20 @@
 title: Start
 ---
-Hi! Welcome to the yarnrunner.go demo.
+Hi! Welcome to the terminal demo.
 Here's an example of [b]bold[/b]!
 Ooh, what about [u]underline[/u]?
-Heh, here's a fun one!
-But I won't do it unless you ask for it...
+Heh, here's a fun one! But I won't do it unless you ask for it...
 Would you like to see [b]blink[/b]?
--> Yeah, wreck my eyeballs!
+-> Yeah, wreck my eyeballs with blink!
+    <<set $blinked to "blinked">>
     Here we go! [blink]BLINK, BLONK[/blink]
-    ... wait, did that work?
+    ... did that work?
     -> Yeah
         Heck yeah!
     -> Nah
-        Maybe you need a real VT100.
+        Maybe you need to enable blinking text in your virtual terminal?
 -> No thank you.
+    <<set $blinked to "didnot">>
     I respect your choice.
 What else do we have here?
 [lowint]Low intensity?[/lowint]
@@ -40,5 +41,5 @@ Which one would you like to take?
 -> The [white]white[/white] gem
     [white]6500K![/white]
 That's the end! Enjoy the gemstone!
-Before disembarking, please remember: always use escape sequences [b][reverse][red]r[/red][yellow]e[/yellow][green]s[/green][cyan]p[/cyan][blue]o[/blue][purple]n[/purple][red]s[/red][yellow]i[/yellow][green]b[/green][cyan]l[/cyan][blue]y[/]
+Before disembarking, please remember to [select {$blinked} blinked="[blink]always[/blink]" didnot="[b]always[/b]"] use escape sequences [b][reverse][red]r[/red][yellow]e[/yellow][green]s[/green][cyan]p[/cyan][blue]o[/blue][purple]n[/purple][red]s[/red][yellow]i[/yellow][green]b[/green][cyan]l[/cyan][blue]y[/]
 ===
