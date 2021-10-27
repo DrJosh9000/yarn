@@ -129,77 +129,6 @@ func (t *StringTable) Render(line Line) (*AttributedString, error) {
 	return lr.attStr(), nil
 }
 
-var (
-	// This lexer is a bit more general than needed since it allows things like
-	// nested functions, but... hey I get nested functions for ~free!
-	lineLexer = lexer.MustStateful(lexer.Rules{
-		"Root": {
-			{Name: "Escaped", Pattern: `\\[\{\}\[\]"\\]`, Action: nil},
-			{Name: "Markup", Pattern: `\[`, Action: lexer.Push("Markup")},
-			{Name: "Subst", Pattern: `{`, Action: lexer.Push("Subst")},
-			{Name: "Char", Pattern: `[%\{\["\\]|[^%\{\["\\]+`, Action: nil},
-		},
-		"Markup": {
-			{Name: "Whitespace", Pattern: `\s+`, Action: nil},
-			{Name: "Slash", Pattern: `/`, Action: nil},
-			{Name: "Ident", Pattern: `\w+`, Action: nil},
-			{Name: "Equals", Pattern: `=`, Action: nil},
-			{Name: "Subst", Pattern: `{`, Action: lexer.Push("Subst")},
-			{Name: "String", Pattern: `"`, Action: lexer.Push("String")},
-			{Name: "MarkupEnd", Pattern: `\]`, Action: lexer.Pop()},
-		},
-		"Subst": {
-			{Name: "Index", Pattern: `\d+`, Action: nil},
-			{Name: "SubstEnd", Pattern: `}`, Action: lexer.Pop()},
-		},
-		"String": {
-			{Name: "StringEnd", Pattern: `"`, Action: lexer.Pop()},
-			lexer.Include("Root"),
-		},
-	})
-
-	// a line is a kind of string, just missing the quotes...
-	lineParser = participle.MustBuild(
-		&parsedString{},
-		participle.Lexer(lineLexer),
-		participle.Elide("Whitespace"),
-	)
-)
-
-// parsedString is used for both entire lines and the contents of double-quoted
-// strings.
-type parsedString struct {
-	Fragments []*fragment `parser:"@@*"`
-}
-
-// fragment is part of a string or line. The parser breaks it into pieces so
-// that special pieces (escape sequences, markup, substitutions, and %) can be
-// processed in a special way.
-type fragment struct {
-	Escaped string        `parser:"@Escaped"`
-	Markup  *parsedMarkup `parser:"| Markup @@ MarkupEnd"`
-	Subst   string        `parser:"| Subst @Index SubstEnd"`
-	Text    string        `parser:"| @Char"`
-}
-
-// parsedMarkup is used for both format functions (select, plural, ordinal) and
-// BBCode-esque markup tags ([b]Bold!?[/b]).
-type parsedMarkup struct {
-	OpeningSlash string        `parser:"@Slash?"`                      // indicates closing tag of a pair
-	Name         string        `parser:"@Ident?"`                      // used for all except close-all tag [/]
-	InputString  *parsedString `parser:"( String @@ StringEnd "`       // used for format funcs (older compiler wrapped the token in quotes)
-	InputSubst   string        `parser:"  | Subst @Index SubstEnd )?"` // used for format funcs (newer compiler did not wrap the token in quotes)
-	Props        []*parsedProp `parser:"@@*"`                          // key="value" properties
-	ClosingSlash string        `parser:"@Slash?"`                      // indicates self-closing tag
-}
-
-// parsedProp is used for key="value" properties of format funcs and markup
-// tags.
-type parsedProp struct {
-	Key   string        `parser:"@Ident Equals"`
-	Value *parsedString `parser:"String @@ StringEnd"`
-}
-
 // AttributedString is a string with additional attributes, such as presentation
 // or styling information, that apply to the whole string or substrings.
 type AttributedString struct {
@@ -260,6 +189,83 @@ type Attribute struct {
 	Props      map[string]string
 }
 
+var (
+	// This lexer is a bit more general than needed since it allows things like
+	// nested functions, but... hey I get nested functions for ~free!
+	lineLexer = lexer.MustStateful(lexer.Rules{
+		"Root": {
+			{Name: "Escaped", Pattern: `\\[\{\}\[\]"\\]`, Action: nil},
+			{Name: "Markup", Pattern: `\[`, Action: lexer.Push("Markup")},
+			{Name: "Subst", Pattern: `{`, Action: lexer.Push("Subst")},
+			{Name: "Char", Pattern: `[%\{\["\\]|[^%\{\["\\]+`, Action: nil},
+		},
+		"Markup": {
+			{Name: "Whitespace", Pattern: `\s+`, Action: nil},
+			{Name: "Slash", Pattern: `/`, Action: nil},
+			{Name: "Ident", Pattern: `\w+`, Action: nil},
+			{Name: "Equals", Pattern: `=`, Action: nil},
+			{Name: "Subst", Pattern: `{`, Action: lexer.Push("Subst")},
+			{Name: "String", Pattern: `"`, Action: lexer.Push("String")},
+			{Name: "MarkupEnd", Pattern: `\]`, Action: lexer.Pop()},
+		},
+		"Subst": {
+			{Name: "Index", Pattern: `\d+`, Action: nil},
+			{Name: "SubstEnd", Pattern: `}`, Action: lexer.Pop()},
+		},
+		"String": {
+			{Name: "StringEnd", Pattern: `"`, Action: lexer.Pop()},
+			lexer.Include("Root"),
+		},
+	})
+
+	// a line is a kind of string, just missing the quotes...
+	lineParser = participle.MustBuild(
+		&parsedString{},
+		participle.Lexer(lineLexer),
+		participle.Elide("Whitespace"),
+	)
+)
+
+// parsedString is used for both entire lines and the contents of double-quoted
+// strings.
+type parsedString struct {
+	Fragments []*fragment `parser:"@@*"`
+}
+
+// fragment is part of a string or line. The parser breaks it into pieces so
+// that special pieces (escape sequences, markup, substitutions, and %) can be
+// processed in a special way.
+type fragment struct {
+	Escaped string           `parser:"@Escaped"`
+	Markup  *parsedMarkupTag `parser:"| Markup @@ MarkupEnd"`
+	Subst   string           `parser:"| Subst @Index SubstEnd"`
+	Text    string           `parser:"| @Char"`
+}
+
+// stringOrSubst appears inside markup tags. The value={0} prop is emitted
+// without quoting the substitution token. Other props are usually of the form
+// key="value".
+type stringOrSubst struct {
+	String *parsedString `parser:"String @@ StringEnd"`
+	Subst  string        `parser:" | Subst @Index SubstEnd"`
+}
+
+// parsedMarkupTag is used for both format functions (select, plural, ordinal) and
+// BBCode-esque markup tags ([b]Bold!?[/b]).
+type parsedMarkupTag struct {
+	OpeningSlash string        `parser:"@Slash?"` // indicates closing tag of a pair
+	Name         string        `parser:"@Ident?"` // used for all except close-all tag [/]
+	Props        []*parsedProp `parser:"@@*"`     // optional key="value" or value={0} properties
+	ClosingSlash string        `parser:"@Slash?"` // indicates self-closing tag
+}
+
+// parsedProp is used for key="value" properties of format funcs and markup
+// tags.
+type parsedProp struct {
+	Key   string         `parser:"@Ident Equals"`
+	Value *stringOrSubst `parser:"@@"` // for ordinary values
+}
+
 type lineRenderer struct {
 	strings.Builder
 	attribs []*Attribute
@@ -279,17 +285,11 @@ func (b *lineRenderer) openTag(name string, props []*parsedProp) error {
 	// Render each prop value into its own string, and put into a map
 	m := make(map[string]string)
 	for _, prop := range props {
-		vsb := &lineRenderer{
-			substs: b.substs,
-			lang:   b.lang,
-		}
-		if err := vsb.renderString(prop.Value); err != nil {
+		v, err := b.evalStringOrSubst(prop.Value)
+		if err != nil {
 			return err
 		}
-		// So ... attributed strings *could* have attributes that have
-		// properties that have values that are attributed strings ...
-		// Haha lol nope.
-		m[prop.Key] = vsb.String()
+		m[prop.Key] = v
 	}
 	a := &Attribute{
 		Start: b.Builder.Len(),
@@ -331,35 +331,38 @@ func (b *lineRenderer) closeAll() {
 	}
 }
 
-func (lr *lineRenderer) renderString(p *parsedString) error {
+func (b *lineRenderer) renderString(p *parsedString) error {
 	for _, f := range p.Fragments {
-		if err := lr.renderFragment(f); err != nil {
+		if err := b.renderFragment(f); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (lr *lineRenderer) renderFragment(s *fragment) error {
+func (b *lineRenderer) renderFragment(s *fragment) error {
 	if s == nil {
 		return nil
 	}
 	switch {
 	case s.Escaped != "":
-		lr.WriteString(s.Escaped[1:])
+		b.WriteString(s.Escaped[1:])
 	case s.Markup != nil:
-		return lr.renderMarkup(s.Markup)
+		return b.renderMarkupTag(s.Markup)
 	case s.Subst != "":
-		n, err := strconv.Atoi(s.Subst)
-		if err != nil || n < 0 || n >= len(lr.substs) {
-			lr.WriteString("{" + s.Subst + "}")
-			break
-		}
-		lr.WriteString(lr.substs[n])
+		b.WriteString(b.evalSubst(s.Subst))
 	default:
-		lr.WriteString(s.Text)
+		b.WriteString(s.Text)
 	}
 	return nil
+}
+
+func (b *lineRenderer) evalSubst(index string) string {
+	n, err := strconv.Atoi(index)
+	if err != nil || n < 0 || n >= len(b.substs) {
+		return "{" + index + "}"
+	}
+	return b.substs[n]
 }
 
 // maps plural.Form values to identifiers used in Yarn Spinner plural and
@@ -373,110 +376,136 @@ var formKeyTable = []string{
 	plural.Many:  "many",
 }
 
-func (lr *lineRenderer) renderMarkup(f *parsedMarkup) error {
-	// InputString is itself a fragment (usually just containing a subst token)
-	// that needs assembling
-	// InputSubst is a subst token that needs to be looked up.
-	var in string
+func (b *lineRenderer) renderMarkupTag(f *parsedMarkupTag) error {
 	switch {
-	case f.InputString != nil:
-		inb := &lineRenderer{
-			substs: lr.substs,
-			lang:   lr.lang,
-		}
-		if err := inb.renderString(f.InputString); err != nil {
+	case f.Name == "select":
+		// [select value={0} m="bro" f="sis" nb="doc" /]
+		return b.renderSelectFormatFunc(f)
+
+	case f.Name == "plural":
+		// [plural value={0} one="an apple" other="% apples" /]
+		return b.renderPluralFormatFunc(f, plural.Cardinal)
+
+	case f.Name == "ordinal":
+		// [ordinal value={0} one="%st" two="%nd" ... /]
+		return b.renderPluralFormatFunc(f, plural.Ordinal)
+
+	case f.OpeningSlash == "/" && f.Name == "":
+		// Close-all tag [/]
+		b.closeAll()
+		return nil
+
+	case f.OpeningSlash == "/":
+		// Close tag [/foo]
+		return b.closeTag(f.Name)
+
+	case f.ClosingSlash == "/":
+		// Self-closing tag [foo/]
+		if err := b.openTag(f.Name, f.Props); err != nil {
 			return err
 		}
-		in = inb.String()
-	case f.InputSubst != "":
-		n, err := strconv.Atoi(f.InputSubst)
-		if err != nil || n < 0 || n >= len(lr.substs) {
-			// uhhhhhh
-			break
-		}
-		in = lr.substs[n]
-	}
+		return b.closeTag(f.Name)
 
-	switch f.Name {
-	case "select":
-		// input chooses which value to interpolate
-		// (input == lookup key)
-		return lr.renderPropValueForKey(f, in, in)
-
-	case "plural":
-		ops, err := cldr.NewOperands(in)
-		if err != nil {
-			return err
-		}
-		form := plural.Cardinal.MatchPlural(lr.lang, int(ops.I), int(ops.V), int(ops.W), int(ops.F), int(ops.T))
-		if int(form) > len(formKeyTable) {
-			return fmt.Errorf("plural form %v not supported", form)
-		}
-		return lr.renderPropValueForKey(f, in, formKeyTable[form])
-
-	case "ordinal":
-		ops, err := cldr.NewOperands(in)
-		if err != nil {
-			return err
-		}
-		form := plural.Ordinal.MatchPlural(lr.lang, int(ops.I), int(ops.V), int(ops.W), int(ops.F), int(ops.T))
-		if int(form) > len(formKeyTable) {
-			return fmt.Errorf("plural form %v not supported", form)
-		}
-		return lr.renderPropValueForKey(f, in, formKeyTable[form])
+	case f.Name != "":
+		// Open tag [foo]
+		return b.openTag(f.Name, f.Props)
 
 	default:
-		// Something else. Style tag I hope.
-		switch {
-		case f.OpeningSlash == "/" && f.Name == "":
-			// Close-all tag
-			lr.closeAll()
-
-		case f.OpeningSlash == "/":
-			// Close tag
-			if err := lr.closeTag(f.Name); err != nil {
-				return err
-			}
-
-		case f.ClosingSlash == "/":
-			// Self-closing tag
-			if err := lr.openTag(f.Name, f.Props); err != nil {
-				return err
-			}
-			if err := lr.closeTag(f.Name); err != nil {
-				return err
-			}
-
-		default:
-			// Open tag
-			if err := lr.openTag(f.Name, f.Props); err != nil {
-				return err
-			}
-		}
+		// Uhhhhhh... [] ?
+		b.WriteString("[]")
 		return nil
 	}
 }
 
-// renderPropValueForKey searches f.Props for the option matching the key, and
-// then renders that option.
-func (lr *lineRenderer) renderPropValueForKey(f *parsedMarkup, input, key string) error {
-	for _, opt := range f.Props {
-		if opt.Key == key {
-			return lr.renderPropValue(opt, input)
-		}
+// evalValueValue returns the string value of the markup tag property called
+// "value". This is used by format functions.
+func (b *lineRenderer) evalValueValue(f *parsedMarkupTag) (string, error) {
+	// Find the value property.
+	val, err := b.propValueForKey(f, "value")
+	if err != nil {
+		return "", err
 	}
-	return fmt.Errorf("key %q not found in %#v", key, f.Props)
+	// Evaluate its value!
+	return b.evalStringOrSubst(val)
 }
 
-func (lr *lineRenderer) renderPropValue(p *parsedProp, input string) error {
-	// Property values have an additional token that needs to be processed
+func (b *lineRenderer) renderSelectFormatFunc(f *parsedMarkupTag) error {
+	// Get the value of the "value" property.
+	input, err := b.evalValueValue(f)
+	if err != nil {
+		return err
+	}
+	// Use that value to find the matching property.
+	val, err := b.propValueForKey(f, input)
+	if err != nil {
+		return err
+	}
+	// Render that value to the output!
+	return b.renderFormatFuncValue(val, input)
+}
+
+func (b *lineRenderer) renderPluralFormatFunc(f *parsedMarkupTag, rules *plural.Rules) error {
+	// Get the value of the "value" property.
+	input, err := b.evalValueValue(f)
+	if err != nil {
+		return err
+	}
+	// Use that value to match the cardinal form.
+	ops, err := cldr.NewOperands(input)
+	if err != nil {
+		return err
+	}
+	form := rules.MatchPlural(b.lang, int(ops.I), int(ops.V), int(ops.W), int(ops.F), int(ops.T))
+	if int(form) > len(formKeyTable) {
+		return fmt.Errorf("plural form %v not supported", form)
+	}
+	// Find the plural form in the properties.
+	val, err := b.propValueForKey(f, formKeyTable[form])
+	if err != nil {
+		return err
+	}
+	// Render that value to the output!
+	return b.renderFormatFuncValue(val, input)
+}
+
+func (b *lineRenderer) evalStringOrSubst(s *stringOrSubst) (string, error) {
+	if s.Subst != "" {
+		return b.evalSubst(s.Subst), nil
+	}
+	inb := &lineRenderer{
+		substs: b.substs,
+		lang:   b.lang,
+	}
+	if err := inb.renderString(s.String); err != nil {
+		return "", err
+	}
+	return inb.String(), nil
+}
+
+// propValueForKey searches f.Props for the option matching the key, and
+// then returns the Value.
+func (b *lineRenderer) propValueForKey(f *parsedMarkupTag, key string) (*stringOrSubst, error) {
+	for _, opt := range f.Props {
+		if opt.Key == key {
+			return opt.Value, nil
+		}
+	}
+	return nil, fmt.Errorf("key %q not found in %#v", key, f.Props)
+}
+
+func (b *lineRenderer) renderFormatFuncValue(s *stringOrSubst, input string) error {
+	// Format func values have an additional token that needs to be processed
 	// specially (%).
-	for _, v := range p.Value.Fragments {
+	if s.Subst != "" {
+		b.WriteString(b.evalSubst(s.Subst))
+		return nil
+	}
+	for _, v := range s.String.Fragments {
 		if v.Text == "%" {
-			lr.WriteString(input)
+			b.WriteString(input)
 			continue
 		}
-		if err := lr.renderFragment(v); err != nil {
+		if err := b.renderFragment(v); err != nil {
 			return err
 		}
 	}

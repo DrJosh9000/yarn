@@ -1,14 +1,14 @@
 # yarn
 
-A Go implementation of parts of Yarn Spinner.
+A Go implementation of parts of Yarn Spinner 2.0.
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/DrJosh9000/yarn.svg)](https://pkg.go.dev/github.com/DrJosh9000/yarn)
 [![Go Report Card](https://goreportcard.com/badge/github.com/DrJosh9000/yarn)](https://goreportcard.com/report/github.com/DrJosh9000/yarn)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/DrJosh9000/yarn/blob/main/LICENSE)
 
 The yarn package is a Go implementation of the
-[Yarn Spinner](https://github.com/YarnSpinnerTool/YarnSpinner) virtual machine
-and dialogue system. Given a compiled `.yarn` file (into the VM bytecode and
+[Yarn Spinner 2.0](https://github.com/YarnSpinnerTool/YarnSpinner) dialogue 
+system. Given a compiled `.yarn` file (into the VM bytecode and
 string table) and `DialogueHandler` implementation, the `VirtualMachine`
 can execute the program as the original Yarn Spinner VM would, delivering lines,
 options, and commands to the handler.
@@ -18,9 +18,9 @@ options, and commands to the handler.
 * ✅ All Yarn Spinner 2.0 machine opcodes and instruction forms.
 * ✅ Yarn Spinner CSV string tables.
 * ✅ String substitutions (`Hello, {0} - you're looking well!`).
-* ✅ `select` format function (`Hey [select "{0}" m="bro" f="sis" nb="doc"]`).
-* ✅ `plural` format function (`That'll be [plural "{0}" one="% dollar" other="% dollars"]`).
-* ✅ `ordinal` format function (`You are currently [ordinal "{0}" one="%st" two="%nd" few="%rd" other="%th"] in the queue`).
+* ✅ `select` format function (`Hey [select value={0} m="bro" f="sis" nb="doc"]`).
+* ✅ `plural` format function (`That'll be [plural value={0} one="% dollar" other="% dollars"]`).
+* ✅ `ordinal` format function (`You are currently [ordinal value={0} one="%st" two="%nd" few="%rd" other="%th"] in the queue`).
   * ✅ ...including using Unicode CLDR for cardinal/ordinal form selection (`en-AU` not assumed!)
 
 ## Usage

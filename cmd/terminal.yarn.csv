@@ -1,41 +1,41 @@
 id,text,file,node,lineNumber
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-0,Hi! Welcome to the terminal demo.,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,3
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-1,Here's an example of [b]bold[/b]!,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,4
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-2,"Ooh, what about [u]underline[/u]?",/Users/josh/Code/yarn/cmd/terminal.yarn,Start,5
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-3,"Heh, here's a fun one! But I won't do it unless you ask for it...",/Users/josh/Code/yarn/cmd/terminal.yarn,Start,6
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-4,Would you like to see [b]blink[/b]?,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,7
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-5,"Yeah, wreck my eyeballs with blink!",/Users/josh/Code/yarn/cmd/terminal.yarn,Start,8
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-6,"Here we go! [blink]BLINK, BLONK[/blink]",/Users/josh/Code/yarn/cmd/terminal.yarn,Start,10
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-7,... did that work?,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,11
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-8,Yeah,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,12
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-9,Heck yeah!,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,13
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-10,Nah,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,14
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-11,Maybe you need to enable blinking text in your virtual terminal?,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,15
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-12,No thank you.,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,16
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-13,I respect your choice.,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,18
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-14,What else do we have here?,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,19
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-15,[lowint]Low intensity?[/lowint],/Users/josh/Code/yarn/cmd/terminal.yarn,Start,20
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-16,[reverse]Reverse?[/reverse],/Users/josh/Code/yarn/cmd/terminal.yarn,Start,21
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-17,[invisible]Invisible?[/invisible],/Users/josh/Code/yarn/cmd/terminal.yarn,Start,22
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-18,"... that last one was ""invisible"", if that wasn't visible.",/Users/josh/Code/yarn/cmd/terminal.yarn,Start,23
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-19,[strike]Strikethrough?[/strike],/Users/josh/Code/yarn/cmd/terminal.yarn,Start,24
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-20,"Uh... ooooh, I found some [b]gemstones[/b]!",/Users/josh/Code/yarn/cmd/terminal.yarn,Start,25
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-21,Which one would you like to take?,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,26
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-22,The [red]red[/red] gem,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,27
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-23,[red]Firey![/],/Users/josh/Code/yarn/cmd/terminal.yarn,Start,28
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-24,The [yellow]yellow[/yellow] gem,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,29
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-25,[yellow]Shiny![/],/Users/josh/Code/yarn/cmd/terminal.yarn,Start,30
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-26,The [green]green[/green] gem,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,31
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-27,[green]Groovy![/],/Users/josh/Code/yarn/cmd/terminal.yarn,Start,32
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-28,The [cyan]cyan[/cyan] gem,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,33
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-29,[cyan]Glowy![/],/Users/josh/Code/yarn/cmd/terminal.yarn,Start,34
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-30,The [blue]blue[/blue] gem,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,35
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-31,[blue]Cool![/],/Users/josh/Code/yarn/cmd/terminal.yarn,Start,36
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-32,The [purple]purple[/purple] gem,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,37
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-33,[purple]High-frequency![/],/Users/josh/Code/yarn/cmd/terminal.yarn,Start,38
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-34,The [grey]gray[/grey] gem,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,39
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-35,[b]First of all how [u]dare[/u] you[/b],/Users/josh/Code/yarn/cmd/terminal.yarn,Start,40
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-36,The [white]white[/white] gem,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,41
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-37,[white]6500K![/white],/Users/josh/Code/yarn/cmd/terminal.yarn,Start,42
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-38,That's the end! Enjoy the gemstone!,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,43
-line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-39,"Before disembarking, please remember to [select {0} blinked=""[blink]always[/blink]"" didnot=""[b]always[/b]""] use escape sequences [b][reverse][red]r[/red][yellow]e[/yellow][green]s[/green][cyan]p[/cyan][blue]o[/blue][purple]n[/purple][red]s[/red][yellow]i[/yellow][green]b[/green][cyan]l[/cyan][blue]y[/]",/Users/josh/Code/yarn/cmd/terminal.yarn,Start,44
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-0,Hi! Welcome to the terminal demo.,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,4
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-1,Here's an example of [b]bold[/b]!,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,5
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-2,"Ooh, what about [u]underline[/u]?",/Users/josh/Code/yarn/cmd/terminal.yarn,Start,6
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-3,"Heh, here's a fun one! But I won't do it unless you ask for it...",/Users/josh/Code/yarn/cmd/terminal.yarn,Start,7
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-4,Would you like to see [b]blink[/b]?,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,8
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-5,"Yeah, wreck my eyeballs with blink!",/Users/josh/Code/yarn/cmd/terminal.yarn,Start,9
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-6,"Here we go! [blink]BLINK, BLONK[/blink]",/Users/josh/Code/yarn/cmd/terminal.yarn,Start,11
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-7,... did that work?,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,12
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-8,Yeah,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,13
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-9,Heck yeah!,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,14
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-10,Nah,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,15
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-11,Maybe you need to enable blinking text in your virtual terminal?,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,16
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-12,No thank you.,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,17
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-13,I respect your choice.,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,19
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-14,What else do we have here?,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,20
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-15,[lowint]Low intensity?[/lowint],/Users/josh/Code/yarn/cmd/terminal.yarn,Start,21
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-16,[reverse]Reverse?[/reverse],/Users/josh/Code/yarn/cmd/terminal.yarn,Start,22
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-17,[invisible]Invisible?[/invisible],/Users/josh/Code/yarn/cmd/terminal.yarn,Start,23
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-18,"... that last one was ""invisible"", if that wasn't visible.",/Users/josh/Code/yarn/cmd/terminal.yarn,Start,24
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-19,[strike]Strikethrough?[/strike],/Users/josh/Code/yarn/cmd/terminal.yarn,Start,25
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-20,"Uh... ooooh, I found some [b]gemstones[/b]!",/Users/josh/Code/yarn/cmd/terminal.yarn,Start,26
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-21,Which one would you like to take?,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,27
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-22,The [red]red[/red] gem,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,28
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-23,[red]Firey![/],/Users/josh/Code/yarn/cmd/terminal.yarn,Start,29
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-24,The [yellow]yellow[/yellow] gem,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,30
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-25,[yellow]Shiny![/],/Users/josh/Code/yarn/cmd/terminal.yarn,Start,31
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-26,The [green]green[/green] gem,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,32
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-27,[green]Groovy![/],/Users/josh/Code/yarn/cmd/terminal.yarn,Start,33
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-28,The [cyan]cyan[/cyan] gem,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,34
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-29,[cyan]Glowy![/],/Users/josh/Code/yarn/cmd/terminal.yarn,Start,35
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-30,The [blue]blue[/blue] gem,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,36
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-31,[blue]Cool![/],/Users/josh/Code/yarn/cmd/terminal.yarn,Start,37
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-32,The [purple]purple[/purple] gem,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,38
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-33,[purple]High-frequency![/],/Users/josh/Code/yarn/cmd/terminal.yarn,Start,39
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-34,The [grey]gray[/grey] gem,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,40
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-35,[b]First of all how [u]dare[/u] you[/b],/Users/josh/Code/yarn/cmd/terminal.yarn,Start,41
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-36,The [white]white[/white] gem,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,42
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-37,[white]6500K![/white],/Users/josh/Code/yarn/cmd/terminal.yarn,Start,43
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-38,That's the end! Enjoy the gemstone!,/Users/josh/Code/yarn/cmd/terminal.yarn,Start,44
+line:/Users/josh/Code/yarn/cmd/terminal.yarn-Start-39,"Before disembarking, please remember to [select value={0} yes=""[blink]always[/blink]"" no=""[b]always[/b]""/] use escape sequences [b][reverse][red]r[/red][yellow]e[/yellow][green]s[/green][cyan]p[/cyan][blue]o[/blue][purple]n[/purple][red]s[/red][yellow]i[/yellow][green]b[/green][cyan]l[/cyan][blue]y[/]",/Users/josh/Code/yarn/cmd/terminal.yarn,Start,45
