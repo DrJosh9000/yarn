@@ -7,21 +7,25 @@ A Go implementation of parts of Yarn Spinner 2.0.
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/DrJosh9000/yarn/blob/main/LICENSE)
 
 The yarn package is a Go implementation of the
-[Yarn Spinner 2.0](https://github.com/YarnSpinnerTool/YarnSpinner) dialogue 
-system. Given a compiled `.yarn` file (into the VM bytecode and
-string table) and `DialogueHandler` implementation, the `VirtualMachine`
-can execute the program as the original Yarn Spinner VM would, delivering lines,
-options, and commands to the handler.
+[Yarn Spinner 2.0](https://github.com/YarnSpinnerTool/YarnSpinner) dialogue
+system. Given a compiled `.yarn` file (into the VM bytecode and string table)
+and `DialogueHandler` implementation, the `VirtualMachine` can execute the
+program as the original Yarn Spinner VM would, delivering lines, options, and
+commands to the handler.
 
 ## Supported features
 
-* ✅ All Yarn Spinner 2.0 machine opcodes and instruction forms.
+* ✅ All Yarn Spinner 2.0 machine opcodes, instruction forms, and standard
+     functions.
+* ✅ Custom functions, similar to the `text/template` package.
 * ✅ Yarn Spinner CSV string tables.
 * ✅ String substitutions (`Hello, {0} - you're looking well!`).
 * ✅ `select` format function (`Hey [select value={0} m="bro" f="sis" nb="doc"]`).
 * ✅ `plural` format function (`That'll be [plural value={0} one="% dollar" other="% dollars"]`).
 * ✅ `ordinal` format function (`You are currently [ordinal value={0} one="%st" two="%nd" few="%rd" other="%th"] in the queue`).
-  * ✅ ...including using Unicode CLDR for cardinal/ordinal form selection (`en-AU` not assumed!)
+  * ✅ ...including using Unicode CLDR for cardinal/ordinal form selection
+    (`en-AU` not assumed!)
+* ✅ Custom markup tags are also parsed, and rendered to an `AttributedString`.
 
 ## Usage
 
@@ -64,7 +68,7 @@ options, and commands to the handler.
        }
        fmt.Print("Enter the number of your choice: ")
        var choice int
-       fmt.Scanf("%d", &choice)
+       fmt.Scanln(&choice)
        return choice, nil
    }
 
@@ -72,7 +76,8 @@ options, and commands to the handler.
    // Alternatively you can embed yarn.FakeDialogueHandler in your handler.
    ```
 
-3. Load the two files, your `DialogueHandler`, and a `VariableStorage` into a
+3. Load the two files, your `DialogueHandler`, a `VariableStorage`, and any
+   custom functions, into a
    `VirtualMachine`, and then pass the name of the first node to `Run`:
 
    ```go
@@ -92,6 +97,12 @@ options, and commands to the handler.
            Program: program,
            Handler: myHandler,
            Vars: make(yarn.MapVariableStorage), // or your own VariableStorage implementation
+           FuncMap: yarn.FuncMap{ // this is optional
+               "last_value": func(x ...interface{}) interface{} {
+                   return x[len(x)-1]
+               },
+               // or your own custom functions!
+           }
        }
 
        // Run the VirtualMachine starting with the Start node!
@@ -118,7 +129,7 @@ node := prog.Nodes["LearnMore"]
 fmt.Println(node.Tags)
 // Source text string ID:
 fmt.Println(node.SourceTextStringID)
-// Source text:
+// Source text is in the string table:
 fmt.Println(st.Table[node.SourceTextStringID].Text)
 ```
 
@@ -153,7 +164,7 @@ func (m *MyHandler) setWaiting(w bool) {
 // Line is called from the goroutine running VirtualMachine.Run.
 func (m *MyHandler) Line(line yarn.Line) error {
     text, _ := m.stringTable.Render(line)
-    m.dialogueDisplay.Show(text.Str+"\n\nPress ENTER to continue")
+    m.dialogueDisplay.Show(text)
     
     // Go into waiting-for-player-input state
     m.setWaiting(true)

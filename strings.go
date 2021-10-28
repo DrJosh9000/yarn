@@ -30,18 +30,13 @@ import (
 	"golang.org/x/text/language"
 )
 
-// StringTableRow contains all the information from one row in a string table.
-type StringTableRow struct {
-	ID, Text, File, Node string
-	LineNumber           int
-}
-
 // StringTable contains all the information from a string table, keyed by
 // string ID. This can be constructed either by using ReadStringTable, or
-// manually (e.g. if you are not using Yarn Spinner CSV string tables).
+// manually (e.g. if you are not using Yarn Spinner CSV string tables but still
+// want to use substitutions, format functions, and markup tags).
 type StringTable struct {
 	Language language.Tag
-	Table    map[string]StringTableRow
+	Table    map[string]*StringTableRow
 }
 
 // LoadStringTableFile is a convenient function for loading a CSV string table
@@ -62,13 +57,16 @@ func LoadStringTableFile(stringTablePath, langCode string) (*StringTable, error)
 
 // ReadStringTable reads a CSV string table from the reader. It assumes the
 // first row is a header. langCode must be a valid BCP 47 language tag.
+// In addition to checking the CSV structure as it is parsed, each lineNumber
+// is parsed as an int, and each text is also parsed. Any malformed substitution
+// tokens or markup tags will cause an error.
 func ReadStringTable(r io.Reader, langCode string) (*StringTable, error) {
 	lang, err := language.Parse(langCode)
 	if err != nil {
 		return nil, fmt.Errorf("invalid lang code: %w", err)
 	}
 
-	st := make(map[string]StringTableRow)
+	st := make(map[string]*StringTableRow)
 	header := true
 	cr := csv.NewReader(r)
 	cr.FieldsPerRecord = 5
@@ -84,18 +82,24 @@ func ReadStringTable(r io.Reader, langCode string) (*StringTable, error) {
 			header = false
 			continue
 		}
+		// Line number must be an int
 		ln, err := strconv.Atoi(rec[4])
 		if err != nil {
-			return nil, fmt.Errorf("atoi: %w", err)
+			return nil, fmt.Errorf("line number not an int: %w", err)
 		}
 		id := rec[0]
-		st[id] = StringTableRow{
+		row := &StringTableRow{
 			ID:         id,
 			Text:       rec[1],
 			File:       rec[2],
 			Node:       rec[3],
 			LineNumber: ln,
 		}
+		// Text must be parseable - parse it now to catch errors sooner
+		if err := row.parseIfNeeded(); err != nil {
+			return nil, fmt.Errorf("text for id %s could not be parsed: %w", id, err)
+		}
+		st[id] = row
 	}
 	return &StringTable{
 		Language: lang,
@@ -107,26 +111,51 @@ func ReadStringTable(r io.Reader, langCode string) (*StringTable, error) {
 // (from line.Substitutions), applies format functions, and processes style
 // tags into attributes.
 func (t *StringTable) Render(line Line) (*AttributedString, error) {
-	row, found := t.Table[line.ID]
-	if !found {
-		return nil, fmt.Errorf("no string %q in string table", line.ID)
+	row := t.Table[line.ID]
+	if row == nil {
+		return nil, fmt.Errorf("string table row for id %q not found or nil", line.ID)
 	}
-	// Parse the line according to the grammar below.
-	filename := fmt.Sprintf("%s:%d", row.File, row.LineNumber)
-	pl := new(parsedString)
-	if err := lineParser.ParseString(filename, row.Text, pl); err != nil {
+	return row.Render(line.Substitutions, t.Language)
+}
+
+// StringTableRow contains all the information from one row in a string table.
+type StringTableRow struct {
+	ID, Text, File, Node string
+	LineNumber           int
+
+	origText   string // parsedText needs updating if Text changes
+	parsedText *parsedString
+}
+
+// Render interpolates substitutions, applies format functions, and processes
+// style tags into attributes.
+func (r *StringTableRow) Render(substs []string, lang language.Tag) (*AttributedString, error) {
+	if err := r.parseIfNeeded(); err != nil {
 		return nil, err
 	}
-
-	// Apply substitutions and format functions into a string builder.
-	lr := &lineRenderer{
-		substs: line.Substitutions,
-		lang:   t.Language,
+	lr := lineRenderer{
+		substs: substs,
+		lang:   lang,
 	}
-	if err := lr.renderString(pl); err != nil {
+	if err := lr.renderString(r.parsedText); err != nil {
 		return nil, err
 	}
 	return lr.attStr(), nil
+}
+
+// parseIfNeeded parses r.Text, if it has not been parsed already.
+func (r *StringTableRow) parseIfNeeded() error {
+	if r.Text == r.origText && r.parsedText != nil {
+		return nil
+	}
+	filename := fmt.Sprintf("%s:%d", r.File, r.LineNumber)
+	pt := new(parsedString)
+	if err := lineParser.ParseString(filename, r.Text, pt); err != nil {
+		return err
+	}
+	r.origText = r.Text
+	r.parsedText = pt
+	return nil
 }
 
 // AttributedString is a string with additional attributes, such as presentation
@@ -151,13 +180,13 @@ func (s *AttributedString) ScanAttribEvents(visit func(att *Attribute, start boo
 	// Make a reference
 	starts := s.Attributes
 	// Sort starts by start
-	sort.Slice(starts, func(i, j int) bool {
+	sort.SliceStable(starts, func(i, j int) bool {
 		return starts[i].Start < starts[j].Start
 	})
 	// Make a *copy*
 	ends := append([]*Attribute(nil), s.Attributes...)
 	// Sort ends by end
-	sort.Slice(ends, func(i, j int) bool {
+	sort.SliceStable(ends, func(i, j int) bool {
 		return ends[i].End < ends[j].End
 	})
 	// March through starts and ends, and do visiting.
