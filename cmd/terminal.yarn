@@ -41,6 +41,7 @@ Which one would you like to take?
     [b]First of all how [u]dare[/u] you[/b]
 -> The [white]white[/white] gem
     [white]6500K![/white]
-That's the end! Enjoy the gemstone!
-Before disembarking, please remember to [select value={$blink} yes="[blink]always[/blink]" no="[b]always[/b]"/] use escape sequences [b][reverse][red]r[/red][yellow]e[/yellow][green]s[/green][cyan]p[/cyan][blue]o[/blue][purple]n[/purple][red]s[/red][yellow]i[/yellow][green]b[/green][cyan]l[/cyan][blue]y[/]
+That's the end! Enjoy the [b][/b]gem[u][/u]stone[b/]!  // tags should have no effect
+Before disembarking, please remember to [select value={$blink} yes="[blink]" no="[b]"/]always[/] use escape sequences [b][reverse][red]r[/red][yellow]e[/yellow][green]s[/green][cyan]p[/cyan][blue]o[/blue][purple]n[/purple][red]s[/red][yellow]i[/yellow][green]b[/green][cyan]l[/cyan][blue]y[/]
+// note in that last line, the select selected another tag ;-)
 ===

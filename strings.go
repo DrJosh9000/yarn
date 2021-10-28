@@ -170,7 +170,21 @@ func (s *AttributedString) String() string { return s.str }
 // ScanAttribEvents calls visit with each change in attribute state. pos is the
 // byte position in the string where the change occurs. atts will contain the
 // attributes that either start or end at pos, in the same order they were read
-// from the original markup.
+// from the original markup. Self-closing tags, or an open and close pair that
+// apply to the same position (i.e. marking up nothing) will only be present in
+// atts once (in the order of the start tag).
+// For example, for the original string:
+//   `[a]Hello A[/a] [b]Hello B[/b] [c][d][/c]No C, [e/]only D[/d]`
+// which is processed into the unattributed string:
+//   `Hello A Hello B No C, only D`
+// ScanAttribEvents will visit:
+// * (0, [a])    -- open of a
+// * (7, [a])    -- close of a
+// * (8, [b])    -- open of b
+// * (15, [b])   -- close of b
+// * (16, [c,d]) -- close of c applies to same position, so it appears once
+// * (22, [e])   -- e is self-closing, so it appears once
+// * (28, [d])   -- close of d
 func (s *AttributedString) ScanAttribEvents(visit func(pos int, atts []*Attribute)) {
 	events := make([]int, 0, len(s.atts))
 	for i := range s.atts {
@@ -285,13 +299,16 @@ func (b *lineRenderer) attStr() *AttributedString {
 
 func (b *lineRenderer) openTag(name string, props []*parsedProp) error {
 	// Render each prop value into its own string, and put into a map
-	m := make(map[string]string)
-	for _, prop := range props {
-		v, err := b.evalStringOrSubst(prop.Value)
-		if err != nil {
-			return err
+	var m map[string]string
+	if len(props) > 0 {
+		m = make(map[string]string)
+		for _, prop := range props {
+			v, err := b.evalStringOrSubst(prop.Value)
+			if err != nil {
+				return err
+			}
+			m[prop.Key] = v
 		}
-		m[prop.Key] = v
 	}
 	a := &Attribute{
 		Start: b.builder.Len(),
@@ -322,6 +339,10 @@ func (b *lineRenderer) closeTag(name string) error {
 	a, as := as[l-1], as[:l-1]
 	b.open[name] = as
 	a.End = b.builder.Len()
+	if a.Start == a.End {
+		// a is already in b.attribs[a.End]
+		return nil
+	}
 	b.attribs[a.End] = append(b.attribs[a.End], a)
 	return nil
 }

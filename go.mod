@@ -9,4 +9,7 @@ require (
 	google.golang.org/protobuf v1.27.1
 )
 
-require github.com/alecthomas/repr v0.0.0-20210801044451-80ca428c5142 // indirect
+require (
+	github.com/alecthomas/repr v0.0.0-20210801044451-80ca428c5142 // indirect
+	github.com/google/go-cmp v0.5.6
+)

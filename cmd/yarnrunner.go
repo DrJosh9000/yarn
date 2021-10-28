@@ -124,6 +124,10 @@ func fancyPrintln(text *yarn.AttributedString) {
 		var newopen []string
 		closed := false
 		for _, a := range atts {
+			if a.Start == a.End {
+				// has no net effect; skip it
+				continue
+			}
 			if a.Start == pos {
 				open[a] = struct{}{}
 				newopen = append(newopen, a.Name)
