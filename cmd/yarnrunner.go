@@ -111,36 +111,45 @@ func (h *dialogueHandler) Options(opts []yarn.Option) (int, error) {
 // This is needed because fmt.Println(text) would only print the string, not the
 // escape sequences needed to apply bold, underline, colour, etc.
 func fancyPrintln(text *yarn.AttributedString) {
+	str := text.String()
 	cursor := 0
 	open := make(map[*yarn.Attribute]struct{})
-	text.ScanAttribEvents(func(att *yarn.Attribute, start bool) {
-		if start {
-			if att.Start > cursor {
-				fmt.Print(text.Str[cursor:att.Start])
-				cursor = att.Start
+	text.ScanAttribEvents(func(pos int, atts []*yarn.Attribute) {
+		if pos > cursor {
+			// Print text to this position
+			fmt.Print(str[cursor:pos])
+			cursor = pos
+		}
+		// atts either start here, end here, or both.
+		var newopen []string
+		closed := false
+		for _, a := range atts {
+			if a.Start == pos {
+				open[a] = struct{}{}
+				newopen = append(newopen, a.Name)
 			}
-			// Print the escape code matching the tag name
-			fmt.Print(escapes[att.Name])
-			// Record it as open
-			open[att] = struct{}{}
-			return
+			if a.End == pos {
+				closed = true
+				delete(open, a)
+			}
 		}
-		// end
-		if att.End > cursor {
-			fmt.Print(text.Str[cursor:att.End])
-			cursor = att.End
+		if closed {
+			// Clear all character attributes
+			fmt.Print("\033[m")
+			for a := range open {
+				// Print escape codes for all the remaining open attributes
+				fmt.Print(escapes[a.Name])
+			}
+		} else {
+			// Only print escape codes for newly opened attributes
+			for _, n := range newopen {
+				fmt.Print(escapes[n])
+			}
 		}
-		// Clear all character attributes
-		fmt.Print("\033[m")
-		// Remove the one that just ended
-		delete(open, att)
-		// Replay all the other attributes that are still open
-		for a := range open {
-			fmt.Print(escapes[a.Name])
-		}
+
 	})
 	// Print remainder
-	fmt.Println(text.Str[cursor:])
+	fmt.Println(str[cursor:])
 }
 
 // Maps style tags to ANSI escape sequences. Printing these changes the style or

@@ -161,51 +161,24 @@ func (r *StringTableRow) parseIfNeeded() error {
 // AttributedString is a string with additional attributes, such as presentation
 // or styling information, that apply to the whole string or substrings.
 type AttributedString struct {
-	Str        string
-	Attributes []*Attribute
+	str  string
+	atts map[int][]*Attribute // position -> attributes starting or ending here
 }
 
-func (s *AttributedString) String() string { return s.Str }
+func (s *AttributedString) String() string { return s.str }
 
-// ScanAttribEvents calls visit with each Attribute twice: once at the start of
-// the attribute, and once at the end. The visit calls will happen in order, but
-// not necessarily the same order as they were originally presented in the
-// source string.
-//
-// For example, an attributed string built from the input
-// `[a]Here's A![/a][b]Here's B! [c]With C now[/c][/b]`
-// could be visited in the order
-// (`a`, start), (`b`, start), (`a`, end), (`c`, start), (`b`, end), (`c`, end).
-func (s *AttributedString) ScanAttribEvents(visit func(att *Attribute, start bool)) {
-	// Make a reference
-	starts := s.Attributes
-	// Sort starts by start
-	sort.SliceStable(starts, func(i, j int) bool {
-		return starts[i].Start < starts[j].Start
-	})
-	// Make a *copy*
-	ends := append([]*Attribute(nil), s.Attributes...)
-	// Sort ends by end
-	sort.SliceStable(ends, func(i, j int) bool {
-		return ends[i].End < ends[j].End
-	})
-	// March through starts and ends, and do visiting.
-	// If the attributed string is well-formed (i.e. start <= end for every
-	// attribute), all the starts must be visited before all the ends, so really
-	// the loop only has to check i < len(starts).
-	// But check j < len(ends) anwyay to avoid a panic in case it is malformed.
-	i, j := 0, 0
-	for i < len(starts) && j < len(ends) {
-		if starts[i].Start <= ends[j].End {
-			visit(starts[i], true)
-			i++
-		} else {
-			visit(ends[j], false)
-			j++
-		}
+// ScanAttribEvents calls visit with each change in attribute state. pos is the
+// byte position in the string where the change occurs. atts will contain the
+// attributes that either start or end at pos, in the same order they were read
+// from the original markup.
+func (s *AttributedString) ScanAttribEvents(visit func(pos int, atts []*Attribute)) {
+	events := make([]int, 0, len(s.atts))
+	for i := range s.atts {
+		events = append(events, i)
 	}
-	for ; j < len(ends); j++ {
-		visit(ends[j], false)
+	sort.Ints(events)
+	for _, pos := range events {
+		visit(pos, s.atts[pos])
 	}
 }
 
@@ -296,17 +269,17 @@ type parsedProp struct {
 }
 
 type lineRenderer struct {
-	strings.Builder
-	attribs []*Attribute
-	open    map[string][]*Attribute // lazily created (by openTag)
+	builder strings.Builder
+	attribs map[int][]*Attribute    // lazily created; position -> tag event
+	open    map[string][]*Attribute // lazily created; name -> stack of tags currently open
 	substs  []string
 	lang    language.Tag
 }
 
 func (b *lineRenderer) attStr() *AttributedString {
 	return &AttributedString{
-		Str:        b.Builder.String(),
-		Attributes: b.attribs,
+		str:  b.builder.String(),
+		atts: b.attribs,
 	}
 }
 
@@ -321,15 +294,18 @@ func (b *lineRenderer) openTag(name string, props []*parsedProp) error {
 		m[prop.Key] = v
 	}
 	a := &Attribute{
-		Start: b.Builder.Len(),
+		Start: b.builder.Len(),
 		Name:  name,
 		Props: m,
 	}
 	if b.open == nil {
-		b.open = map[string][]*Attribute{name: {a}}
-		return nil
+		b.open = make(map[string][]*Attribute)
+	}
+	if b.attribs == nil {
+		b.attribs = make(map[int][]*Attribute)
 	}
 	b.open[name] = append(b.open[name], a)
+	b.attribs[a.Start] = append(b.attribs[a.Start], a)
 	return nil
 }
 
@@ -342,19 +318,19 @@ func (b *lineRenderer) closeTag(name string) error {
 	if l == 0 {
 		return fmt.Errorf("tag %q not open", name)
 	}
-	// Close the last one
+	// Close the most recent one
 	a, as := as[l-1], as[:l-1]
 	b.open[name] = as
-	a.End = b.Builder.Len()
-	b.attribs = append(b.attribs, a)
+	a.End = b.builder.Len()
+	b.attribs[a.End] = append(b.attribs[a.End], a)
 	return nil
 }
 
 func (b *lineRenderer) closeAll() {
 	for name, as := range b.open {
 		for _, a := range as {
-			a.End = b.Builder.Len()
-			b.attribs = append(b.attribs, a)
+			a.End = b.builder.Len()
+			b.attribs[a.End] = append(b.attribs[a.End], a)
 		}
 		delete(b.open, name)
 	}
@@ -375,13 +351,13 @@ func (b *lineRenderer) renderFragment(s *fragment) error {
 	}
 	switch {
 	case s.Escaped != "":
-		b.WriteString(s.Escaped[1:])
+		b.builder.WriteString(s.Escaped[1:])
 	case s.Markup != nil:
 		return b.renderMarkupTag(s.Markup)
 	case s.Subst != "":
-		b.WriteString(b.evalSubst(s.Subst))
+		b.builder.WriteString(b.evalSubst(s.Subst))
 	default:
-		b.WriteString(s.Text)
+		b.builder.WriteString(s.Text)
 	}
 	return nil
 }
@@ -441,7 +417,7 @@ func (b *lineRenderer) renderMarkupTag(f *parsedMarkupTag) error {
 
 	default:
 		// Uhhhhhh... [] ?
-		b.WriteString("[]")
+		b.builder.WriteString("[]")
 		return nil
 	}
 }
@@ -508,7 +484,7 @@ func (b *lineRenderer) evalStringOrSubst(s *stringOrSubst) (string, error) {
 	if err := inb.renderString(s.String); err != nil {
 		return "", err
 	}
-	return inb.String(), nil
+	return inb.builder.String(), nil
 }
 
 // propValueForKey searches f.Props for the option matching the key, and
@@ -526,12 +502,12 @@ func (b *lineRenderer) renderFormatFuncValue(s *stringOrSubst, input string) err
 	// Format func values have an additional token that needs to be processed
 	// specially (%).
 	if s.Subst != "" {
-		b.WriteString(b.evalSubst(s.Subst))
+		b.builder.WriteString(b.evalSubst(s.Subst))
 		return nil
 	}
 	for _, v := range s.String.Fragments {
 		if v.Text == "%" {
-			b.WriteString(input)
+			b.builder.WriteString(input)
 			continue
 		}
 		if err := b.renderFragment(v); err != nil {
