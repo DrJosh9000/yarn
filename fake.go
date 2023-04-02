@@ -20,13 +20,13 @@ import "errors"
 // methods. This is useful both for testing, and for satisfying the interface
 // via embedding, e.g.:
 //
-//    type MyHandler struct {
-//	      FakeDialogueHandler
-//    }
-//    // MyHandler is only interested in Line and Options.
-//    func (m MyHandler) Line(line Line) error { ... }
-//    func (m MyHandler) Options(options []Option) (int, error) { ... }
-//    // All the other DialogueHandler methods provided by FakeDialogueHandler.
+//	   type MyHandler struct {
+//		      FakeDialogueHandler
+//	   }
+//	   // MyHandler is only interested in Line and Options.
+//	   func (m MyHandler) Line(line Line) error { ... }
+//	   func (m MyHandler) Options(options []Option) (int, error) { ... }
+//	   // All the other DialogueHandler methods provided by FakeDialogueHandler.
 type FakeDialogueHandler struct{}
 
 // NodeStart returns nil.

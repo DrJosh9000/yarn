@@ -174,9 +174,13 @@ func (s *AttributedString) String() string { return s.str }
 // apply to the same position (i.e. marking up nothing) will only be present in
 // atts once (in the order of the start tag).
 // For example, for the original string:
-//   `[a]Hello A[/a] [b]Hello B[/b] [c][d][/c]No C, [e/]only D[/d]`
+//
+//	`[a]Hello A[/a] [b]Hello B[/b] [c][d][/c]No C, [e/]only D[/d]`
+//
 // which is processed into the unattributed string:
-//   `Hello A Hello B No C, only D`
+//
+//	`Hello A Hello B No C, only D`
+//
 // ScanAttribEvents will visit:
 // * (0, [a])    -- open of a
 // * (7, [a])    -- close of a

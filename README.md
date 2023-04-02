@@ -30,7 +30,7 @@ commands to the handler.
     (`en-AU` not assumed!)
 * ✅ Custom markup tags are also parsed, and rendered to an `AttributedString`.
 * ✅ `visited` and `visit_count`
-* Built-in functions mentioned in the Yarn Spinner documentation.
+* Built-in functions like `dice`, `round`, and `floor` that are mentioned in the Yarn Spinner documentation.
 
 ## Usage
 
