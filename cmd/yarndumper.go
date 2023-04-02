@@ -31,7 +31,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/DrJosh9000/yarn"
+	"github.com/kalexmills/yarn"
 )
 
 func main() {

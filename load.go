@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"os"
 
-	yarnpb "github.com/DrJosh9000/yarn/bytecode"
+	yarnpb "github.com/kalexmills/yarn/bytecode"
 	"google.golang.org/protobuf/proto"
 )
 
