@@ -18,6 +18,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"sort"
 	"strconv"
@@ -44,6 +45,21 @@ type StringTable struct {
 // valid BCP 47 language tag.
 func LoadStringTableFile(stringTablePath, langCode string) (*StringTable, error) {
 	csv, err := os.Open(stringTablePath)
+	if err != nil {
+		return nil, fmt.Errorf("opening string table file: %w", err)
+	}
+	defer csv.Close()
+	st, err := ReadStringTable(csv, langCode)
+	if err != nil {
+		return nil, fmt.Errorf("reading string table: %w", err)
+	}
+	return st, nil
+}
+
+// LoadStringTableFileFS loads compiled Yarn Spinner files from the provided fs.FS.
+// See LoadStringTableFile for details.
+func LoadStringTableFileFS(fsys fs.FS, stringTablePath, langCode string) (*StringTable, error) {
+	csv, err := fsys.Open(stringTablePath)
 	if err != nil {
 		return nil, fmt.Errorf("opening string table file: %w", err)
 	}

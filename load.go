@@ -16,6 +16,7 @@ package yarn
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 
 	yarnpb "github.com/kalexmills/yarn/bytecode"
@@ -37,6 +38,24 @@ func LoadFiles(programPath, stringTablePath, langCode string) (*yarnpb.Program, 
 	return prog, st, nil
 }
 
+// LoadFilesFS loads compiled Yarn Spinner files from the provided fs.FS.
+// See LoadFiles for more information.
+func LoadFilesFS(fsys fs.FS, programPath, stringTablePath, langCode string) (*yarnpb.Program, *StringTable, error) {
+	yarnc, err := fs.ReadFile(fsys, programPath)
+	if err != nil {
+		return nil, nil, err
+	}
+	prog, err := unmarshalBytes(yarnc)
+	if err != nil {
+		return nil, nil, err
+	}
+	st, err := LoadStringTableFileFS(fsys, stringTablePath, langCode)
+	if err != nil {
+		return nil, nil, err
+	}
+	return prog, st, nil
+}
+
 // LoadProgramFile is a convenient function for loading a compiled Yarn Spinner
 // program given a file path.
 func LoadProgramFile(programPath string) (*yarnpb.Program, error) {
@@ -44,6 +63,10 @@ func LoadProgramFile(programPath string) (*yarnpb.Program, error) {
 	if err != nil {
 		return nil, fmt.Errorf("reading program file: %w", err)
 	}
+	return unmarshalBytes(yarnc)
+}
+
+func unmarshalBytes(yarnc []byte) (*yarnpb.Program, error) {
 	prog := new(yarnpb.Program)
 	if err := proto.Unmarshal(yarnc, prog); err != nil {
 		return nil, fmt.Errorf("unmarshaling program: %w", err)
