@@ -1,0 +1,8 @@
+id,text,file,node,lineNumber
+line:/Users/kalexmills/repos/personal/yarn/testdata/VisitTracking.yarn-Start-0,beginning,/Users/kalexmills/repos/personal/yarn/testdata/VisitTracking.yarn,Start,3
+line:/Users/kalexmills/repos/personal/yarn/testdata/VisitTracking.yarn-NoTrack-1,entered NoTrack,/Users/kalexmills/repos/personal/yarn/testdata/VisitTracking.yarn,NoTrack,10
+line:/Users/kalexmills/repos/personal/yarn/testdata/VisitTracking.yarn-Track-2,entered Track,/Users/kalexmills/repos/personal/yarn/testdata/VisitTracking.yarn,Track,17
+line:/Users/kalexmills/repos/personal/yarn/testdata/VisitTracking.yarn-End-3,entered End,/Users/kalexmills/repos/personal/yarn/testdata/VisitTracking.yarn,End,23
+line:/Users/kalexmills/repos/personal/yarn/testdata/VisitTracking.yarn-End-4,did we visit NoTrack? {0}!,/Users/kalexmills/repos/personal/yarn/testdata/VisitTracking.yarn,End,24
+line:/Users/kalexmills/repos/personal/yarn/testdata/VisitTracking.yarn-End-5,did we visit Track? {0}!,/Users/kalexmills/repos/personal/yarn/testdata/VisitTracking.yarn,End,25
+line:/Users/kalexmills/repos/personal/yarn/testdata/VisitTracking.yarn-End-6,done,/Users/kalexmills/repos/personal/yarn/testdata/VisitTracking.yarn,End,26

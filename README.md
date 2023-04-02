@@ -2,10 +2,10 @@
 
 A Go implementation of parts of Yarn Spinner 2.0.
 
-![Build status](https://github.com/DrJosh9000/yarn/actions/workflows/go.yml/badge.svg)
-[![Go Reference](https://pkg.go.dev/badge/github.com/DrJosh9000/yarn.svg)](https://pkg.go.dev/github.com/DrJosh9000/yarn)
-[![Go Report Card](https://goreportcard.com/badge/github.com/DrJosh9000/yarn)](https://goreportcard.com/report/github.com/DrJosh9000/yarn)
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/DrJosh9000/yarn/blob/main/LICENSE)
+![Build status](https://github.com/kalexmills/yarn/actions/workflows/go.yml/badge.svg)
+[![Go Reference](https://pkg.go.dev/badge/github.com/kalexmills/yarn.svg)](https://pkg.go.dev/github.com/kalexmills/yarn)
+[![Go Report Card](https://goreportcard.com/badge/github.com/kalexmills/yarn)](https://goreportcard.com/report/github.com/kalexmills/yarn)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/kalexmillsgit /yarn/blob/main/LICENSE)
 
 The yarn package is a Go implementation of the
 [Yarn Spinner 2.0](https://github.com/YarnSpinnerTool/YarnSpinner) dialogue

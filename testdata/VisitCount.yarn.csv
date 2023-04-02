@@ -1,0 +1,6 @@
+id,text,file,node,lineNumber
+line:/Users/kalexmills/repos/personal/yarn/testdata/VisitCount.yarn-Start-0,entered start,/Users/kalexmills/repos/personal/yarn/testdata/VisitCount.yarn,Start,3
+line:/Users/kalexmills/repos/personal/yarn/testdata/VisitCount.yarn-Start-1,seconds visited count is {0},/Users/kalexmills/repos/personal/yarn/testdata/VisitCount.yarn,Start,4
+line:/Users/kalexmills/repos/personal/yarn/testdata/VisitCount.yarn-second-2,second visited {0} times,/Users/kalexmills/repos/personal/yarn/testdata/VisitCount.yarn,second,11
+line:/Users/kalexmills/repos/personal/yarn/testdata/VisitCount.yarn-third-3,entered third,/Users/kalexmills/repos/personal/yarn/testdata/VisitCount.yarn,third,20
+line:/Users/kalexmills/repos/personal/yarn/testdata/VisitCount.yarn-third-4,seconds was visited a total of {0} times,/Users/kalexmills/repos/personal/yarn/testdata/VisitCount.yarn,third,21
