@@ -72,6 +72,15 @@ func TestAllTestPlans(t *testing.T) {
 						}
 						return x[len(x)-1], nil
 					},
+					"dummy_number": func() float32 {
+						return 1
+					},
+					"dummy_bool": func() bool {
+						return true
+					},
+					"dummy_string": func() string {
+						return "string"
+					},
 				},
 			}
 			testplan.StringTable = st
