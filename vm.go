@@ -116,6 +116,9 @@ type VirtualMachine struct {
 	TraceLogf func(string, ...interface{})
 
 	state state
+
+	// visitCounts stores the number of times each node has been visited.
+	visitCounts map[string]int
 }
 
 // SetNode sets the VM to begin a node. If a node is already selected,
@@ -142,6 +145,7 @@ func (vm *VirtualMachine) SetNode(name string) error {
 	vm.state = state{
 		node: node,
 	}
+
 	if err := vm.Handler.NodeStart(name); err != nil {
 		return fmt.Errorf("handler.NodeStart: %w", err)
 	}
@@ -169,7 +173,7 @@ func (vm *VirtualMachine) Run(startNode string) error {
 		return ErrNilVariableStorage
 	}
 	// Provide default funcs, merge provided funcmap to allow overrides.
-	vm.FuncMap = defaultFuncMap().merge(vm.FuncMap)
+	vm.FuncMap = vm.defaultFuncMap().merge(vm.FuncMap)
 	// Set start node
 	if err := vm.SetNode(startNode); err != nil {
 		return err
@@ -196,6 +200,24 @@ instructionLoop:
 		return fmt.Errorf("handler.DialogueComplete: %w", err)
 	}
 	return nil
+}
+
+// defaultFuncMap provides the default func map for this VM along with all built-in functions.
+func (vm *VirtualMachine) defaultFuncMap() FuncMap {
+	result := defaultFuncMap()
+	result.merge(map[string]interface{}{
+		"visited": func(nodeName string) bool {
+			_, ok := vm.Vars.GetValue(fmt.Sprintf("$Yarn.Internal.Visiting.%s", nodeName))
+			return ok
+		},
+		"visited_count": func(nodeName string) int {
+			if count, ok := vm.Vars.GetValue(fmt.Sprintf("$Yarn.Internal.Visiting.%s", nodeName)); ok {
+				return int(count.(float32))
+			}
+			return 0
+		},
+	})
+	return result
 }
 
 func (vm *VirtualMachine) execute(inst *yarnpb.Instruction) error {
