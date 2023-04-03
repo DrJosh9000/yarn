@@ -38,11 +38,10 @@ func TestAllTestPlans(t *testing.T) {
 
 			base := strings.TrimSuffix(filepath.Base(tpn), ".testplan")
 
-			yarnc := "testdata/" + base + ".yarn.yarnc"
-			csv := "testdata/" + base + ".yarn.csv"
-			prog, st, err := LoadFiles(yarnc, csv, "en")
+			yarnc := "testdata/" + base + ".yarnc"
+			prog, st, err := LoadFiles(yarnc, "en")
 			if err != nil {
-				t.Fatalf("LoadFiles(%q, %q, en) = error %v", yarnc, csv, err)
+				t.Fatalf("LoadFiles(%q, en) = error %v", yarnc, err)
 			}
 
 			vm := &VirtualMachine{

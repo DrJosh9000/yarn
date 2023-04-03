@@ -41,8 +41,9 @@ type StringTable struct {
 }
 
 // LoadStringTableFile is a convenient function for loading a CSV string table
-// given a file path. It assumes the first row is a header. langCode must be a
-// valid BCP 47 language tag.
+// given a file path. If stringTablePath is foo/bar/file-Lines.csv then it expects
+// a corresponding Metadata file at foo/bar/file-Metadata.csv. It assumes the first
+// row of both files are a header. langCode must be a valid BCP 47 language tag.
 func LoadStringTableFile(stringTablePath, langCode string) (*StringTable, error) {
 	csv, err := os.Open(stringTablePath)
 	if err != nil {
@@ -52,6 +53,13 @@ func LoadStringTableFile(stringTablePath, langCode string) (*StringTable, error)
 	st, err := ReadStringTable(csv, langCode)
 	if err != nil {
 		return nil, fmt.Errorf("reading string table: %w", err)
+	}
+	csv, err = os.Open(metadataTablePath(stringTablePath))
+	if err != nil {
+		return nil, fmt.Errorf("opening metadata file: %w", err)
+	}
+	if err := st.readMetadata(csv); err != nil {
+		return nil, fmt.Errorf("reading metadata file: %w", err)
 	}
 	return st, nil
 }
@@ -67,6 +75,13 @@ func LoadStringTableFileFS(fsys fs.FS, stringTablePath, langCode string) (*Strin
 	st, err := ReadStringTable(csv, langCode)
 	if err != nil {
 		return nil, fmt.Errorf("reading string table: %w", err)
+	}
+	csv, err = fsys.Open(metadataTablePath(stringTablePath))
+	if err != nil {
+		return nil, fmt.Errorf("opening metadata file: %w", err)
+	}
+	if err := st.readMetadata(csv); err != nil {
+		return nil, fmt.Errorf("reading metadata table: %w", err)
 	}
 	return st, nil
 }
@@ -92,7 +107,7 @@ func ReadStringTable(r io.Reader, langCode string) (*StringTable, error) {
 			break
 		}
 		if err != nil {
-			return nil, fmt.Errorf("csv read: %v", err)
+			return nil, fmt.Errorf("csv read: %w", err)
 		}
 		if header {
 			header = false
@@ -123,6 +138,33 @@ func ReadStringTable(r io.Reader, langCode string) (*StringTable, error) {
 	}, nil
 }
 
+// readMetadata extracts tags from the metadata table.
+func (t *StringTable) readMetadata(r io.Reader) error {
+	header := true
+	cr := csv.NewReader(r)
+	cr.FieldsPerRecord = -1 // tags can be multirow
+	for {
+		rec, err := cr.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("csv error: %w", err)
+		}
+		if header {
+			header = false
+			continue
+		}
+		id := rec[0]
+		row, ok := t.Table[id]
+		if !ok {
+			return fmt.Errorf("unexpected ID in metadata table: '%s'", id)
+		}
+		row.Tags = rec[3:]
+	}
+	return nil
+}
+
 // Render looks up the row corresponding to line.ID, interpolates substitutions
 // (from line.Substitutions), applies format functions, and processes style
 // tags into attributes.
@@ -141,6 +183,8 @@ type StringTableRow struct {
 
 	origText   string // parsedText needs updating if Text changes
 	parsedText *parsedString
+
+	Tags []string // Tags are set in the metadata table.
 }
 
 // Render interpolates substitutions, applies format functions, and processes
