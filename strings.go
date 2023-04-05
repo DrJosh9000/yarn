@@ -155,6 +155,9 @@ func (t *StringTable) readMetadata(r io.Reader) error {
 			header = false
 			continue
 		}
+		if len(rec) < 4 { // nothing to do if there are fewer than 4 rows.
+			continue
+		}
 		id := rec[0]
 		row, ok := t.Table[id]
 		if !ok {
