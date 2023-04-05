@@ -116,9 +116,6 @@ type VirtualMachine struct {
 	TraceLogf func(string, ...interface{})
 
 	state state
-
-	// visitCounts stores the number of times each node has been visited.
-	visitCounts map[string]int
 }
 
 // SetNode sets the VM to begin a node. If a node is already selected,
