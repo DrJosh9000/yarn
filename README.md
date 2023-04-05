@@ -1,8 +1,6 @@
 # yarn
 
-A Go implementation of parts of Yarn Spinner 2.2.
-
-Derived from [github.com/DrJosh9000/yarn](https://github.com/DrJosh9000/yarn), but updated to use most the recent Protobuf files and include more tests from upstream.
+A Go implementation of parts of Yarn Spinner 2.3.
 
 ![Build status](https://github.com/DrJosh9000/yarn/actions/workflows/go.yml/badge.svg)
 [![Go Reference](https://pkg.go.dev/badge/github.com/DrJosh9000/yarn.svg)](https://pkg.go.dev/github.com/DrJosh9000/yarn)
