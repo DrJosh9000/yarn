@@ -1,15 +1,15 @@
 id,text,file,node,lineNumber
-line:/Users/kalexmills/repos/personal/yarn/testdata/Example.yarn-Start-0,"A: Hey, I'm a character in a script!",/Users/kalexmills/repos/personal/yarn/testdata/Example.yarn,Start,6
-line:/Users/kalexmills/repos/personal/yarn/testdata/Example.yarn-Start-1,B: And I am too! You are talking to me!,/Users/kalexmills/repos/personal/yarn/testdata/Example.yarn,Start,7
-line:/Users/kalexmills/repos/personal/yarn/testdata/Example.yarn-Start-2,What's going on,/Users/kalexmills/repos/personal/yarn/testdata/Example.yarn,Start,8
-line:/Users/kalexmills/repos/personal/yarn/testdata/Example.yarn-Start-3,A: Why this is a demo of the script system!,/Users/kalexmills/repos/personal/yarn/testdata/Example.yarn,Start,9
-line:/Users/kalexmills/repos/personal/yarn/testdata/Example.yarn-Start-4,B: And you're in it!,/Users/kalexmills/repos/personal/yarn/testdata/Example.yarn,Start,10
-line:/Users/kalexmills/repos/personal/yarn/testdata/Example.yarn-Start-5,Um ok,/Users/kalexmills/repos/personal/yarn/testdata/Example.yarn,Start,11
-line:/Users/kalexmills/repos/personal/yarn/testdata/Example.yarn-Start-6,A: How delightful!,/Users/kalexmills/repos/personal/yarn/testdata/Example.yarn,Start,12
-line:/Users/kalexmills/repos/personal/yarn/testdata/Example.yarn-Start-7,B: What would you prefer to do next?,/Users/kalexmills/repos/personal/yarn/testdata/Example.yarn,Start,13
-line:/Users/kalexmills/repos/personal/yarn/testdata/Example.yarn-Start-8,Leave,/Users/kalexmills/repos/personal/yarn/testdata/Example.yarn,Start,14
-line:/Users/kalexmills/repos/personal/yarn/testdata/Example.yarn-Start-9,Learn more,/Users/kalexmills/repos/personal/yarn/testdata/Example.yarn,Start,16
-line:/Users/kalexmills/repos/personal/yarn/testdata/Example.yarn-Leave-10,"A: Oh, goodbye!",/Users/kalexmills/repos/personal/yarn/testdata/Example.yarn,Leave,24
-line:/Users/kalexmills/repos/personal/yarn/testdata/Example.yarn-Leave-11,B: You'll be back soon!,/Users/kalexmills/repos/personal/yarn/testdata/Example.yarn,Leave,25
+line:/Users/DrJosh9000/repos/personal/yarn/testdata/Example.yarn-Start-0,"A: Hey, I'm a character in a script!",/Users/DrJosh9000/repos/personal/yarn/testdata/Example.yarn,Start,6
+line:/Users/DrJosh9000/repos/personal/yarn/testdata/Example.yarn-Start-1,B: And I am too! You are talking to me!,/Users/DrJosh9000/repos/personal/yarn/testdata/Example.yarn,Start,7
+line:/Users/DrJosh9000/repos/personal/yarn/testdata/Example.yarn-Start-2,What's going on,/Users/DrJosh9000/repos/personal/yarn/testdata/Example.yarn,Start,8
+line:/Users/DrJosh9000/repos/personal/yarn/testdata/Example.yarn-Start-3,A: Why this is a demo of the script system!,/Users/DrJosh9000/repos/personal/yarn/testdata/Example.yarn,Start,9
+line:/Users/DrJosh9000/repos/personal/yarn/testdata/Example.yarn-Start-4,B: And you're in it!,/Users/DrJosh9000/repos/personal/yarn/testdata/Example.yarn,Start,10
+line:/Users/DrJosh9000/repos/personal/yarn/testdata/Example.yarn-Start-5,Um ok,/Users/DrJosh9000/repos/personal/yarn/testdata/Example.yarn,Start,11
+line:/Users/DrJosh9000/repos/personal/yarn/testdata/Example.yarn-Start-6,A: How delightful!,/Users/DrJosh9000/repos/personal/yarn/testdata/Example.yarn,Start,12
+line:/Users/DrJosh9000/repos/personal/yarn/testdata/Example.yarn-Start-7,B: What would you prefer to do next?,/Users/DrJosh9000/repos/personal/yarn/testdata/Example.yarn,Start,13
+line:/Users/DrJosh9000/repos/personal/yarn/testdata/Example.yarn-Start-8,Leave,/Users/DrJosh9000/repos/personal/yarn/testdata/Example.yarn,Start,14
+line:/Users/DrJosh9000/repos/personal/yarn/testdata/Example.yarn-Start-9,Learn more,/Users/DrJosh9000/repos/personal/yarn/testdata/Example.yarn,Start,16
+line:/Users/DrJosh9000/repos/personal/yarn/testdata/Example.yarn-Leave-10,"A: Oh, goodbye!",/Users/DrJosh9000/repos/personal/yarn/testdata/Example.yarn,Leave,24
+line:/Users/DrJosh9000/repos/personal/yarn/testdata/Example.yarn-Leave-11,B: You'll be back soon!,/Users/DrJosh9000/repos/personal/yarn/testdata/Example.yarn,Leave,25
 line:LearnMore,"A: HAHAHA
-",/Users/kalexmills/repos/personal/yarn/testdata/Example.yarn,LearnMore,32
+",/Users/DrJosh9000/repos/personal/yarn/testdata/Example.yarn,LearnMore,32

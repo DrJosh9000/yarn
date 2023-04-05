@@ -34,7 +34,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/kalexmills/yarn"
+	"github.com/DrJosh9000/yarn"
 )
 
 func main() {

@@ -20,7 +20,7 @@ import (
 	"os"
 	"strings"
 
-	yarnpb "github.com/kalexmills/yarn/bytecode"
+	yarnpb "github.com/DrJosh9000/yarn/bytecode"
 	"google.golang.org/protobuf/proto"
 )
 

@@ -1,4 +1,4 @@
-module github.com/kalexmills/yarn
+module github.com/DrJosh9000/yarn
 
 go 1.17
 

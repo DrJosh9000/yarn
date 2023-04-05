@@ -15,7 +15,7 @@
 // Package yarn implements the Yarn Spinner virtual machine and dialogue system.
 // For the original implementation, see https://yarnspinner.dev and
 // https://github.com/YarnSpinnerTool/YarnSpinner.
-package yarn // import "github.com/kalexmills/yarn"
+package yarn // import "github.com/DrJosh9000/yarn"
 
 import (
 	"errors"
@@ -23,7 +23,7 @@ import (
 	"reflect"
 	"strings"
 
-	yarnpb "github.com/kalexmills/yarn/bytecode"
+	yarnpb "github.com/DrJosh9000/yarn/bytecode"
 )
 
 // Various sentinel errors returned by the virtual machine.
