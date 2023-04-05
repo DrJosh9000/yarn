@@ -1,26 +1,26 @@
 id,text,file,node,lineNumber
-line:/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn-Start-0,Here's a line with a hashtag,/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn,Start,3
-line:/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn-Start-1,Here's a line with an escaped hashtag #hashtag,/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn,Start,4
-line:/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn-Start-2,Here's a line with an expression {0},/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn,Start,6
-line:/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn-Start-3,Here's a line with an escaped expression {0},/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn,Start,7
-line:/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn-Start-4,Here's a line with an escaped command <<foo>>,/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn,Start,12
-line:/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn-Start-5,Here's a line with a comment,/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn,Start,14
-line:/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn-Start-6,Here's a line with an escaped comment // wow,/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn,Start,15
-line:/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn-Start-7,Here's a line with an escaped backslash \,/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn,Start,17
-line:/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn-Start-8,Here's some TMP-style styling with a color code: <color=#fff>wow</color>,/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn,Start,19
-line:/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn-Start-9,Here's a url: http://github.com/YarnSpinnerTool,/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn,Start,21
-line:/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn-Start-10,Here's some markup: [a]hello[/a],/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn,Start,25
-line:/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn-Start-11,Here's some escaped markup: \[a\]hello\[/a\],/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn,Start,26
-line:/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn-Start-12,Here's an option with a hashtag,/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn,Start,28
-line:/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn-Start-13,Here's an option with an escaped hashtag #hashtag,/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn,Start,29
-line:/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn-Start-14,Here's an option with an expression {0},/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn,Start,30
-line:/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn-Start-15,Here's an option with an escaped expression {0},/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn,Start,31
-line:/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn-Start-16,Here's an option with a condition,/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn,Start,32
-line:/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn-Start-17,Here's an option with an escaped condition <<if true>>,/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn,Start,33
-line:/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn-Start-18,Here's an option with a comment,/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn,Start,34
-line:/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn-Start-19,Here's an option with an escaped comment // wow,/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn,Start,35
-line:/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn-Start-20,Here's an option with an escaped backslash \,/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn,Start,36
-line:/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn-Start-21,Here's some TMP-style styling with a color code: <color=#fff>wow</color>,/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn,Start,37
-line:/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn-Start-22,Here's a url: http://github.com/YarnSpinnerTool,/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn,Start,38
-line:/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn-Start-23,Here's some markup: [a]hello[/a],/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn,Start,39
-line:/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn-Start-24,Here's some escaped markup: \[a\]hello\[/a\],/Users/DrJosh9000/repos/personal/yarn/testdata/Escaping.yarn,Start,40
+line:/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn-Start-0,Here's a line with a hashtag,/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn,Start,3
+line:/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn-Start-1,Here's a line with an escaped hashtag #hashtag,/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn,Start,4
+line:/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn-Start-2,Here's a line with an expression {0},/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn,Start,6
+line:/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn-Start-3,Here's a line with an escaped expression {0},/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn,Start,7
+line:/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn-Start-4,Here's a line with an escaped command <<foo>>,/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn,Start,12
+line:/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn-Start-5,Here's a line with a comment,/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn,Start,14
+line:/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn-Start-6,Here's a line with an escaped comment // wow,/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn,Start,15
+line:/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn-Start-7,Here's a line with an escaped backslash \,/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn,Start,17
+line:/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn-Start-8,Here's some TMP-style styling with a color code: <color=#fff>wow</color>,/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn,Start,19
+line:/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn-Start-9,Here's a url: http://github.com/YarnSpinnerTool,/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn,Start,21
+line:/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn-Start-10,Here's some markup: [a]hello[/a],/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn,Start,25
+line:/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn-Start-11,Here's some escaped markup: \[a\]hello\[/a\],/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn,Start,26
+line:/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn-Start-12,Here's an option with a hashtag,/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn,Start,28
+line:/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn-Start-13,Here's an option with an escaped hashtag #hashtag,/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn,Start,29
+line:/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn-Start-14,Here's an option with an expression {0},/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn,Start,30
+line:/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn-Start-15,Here's an option with an escaped expression {0},/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn,Start,31
+line:/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn-Start-16,Here's an option with a condition,/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn,Start,32
+line:/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn-Start-17,Here's an option with an escaped condition <<if true>>,/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn,Start,33
+line:/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn-Start-18,Here's an option with a comment,/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn,Start,34
+line:/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn-Start-19,Here's an option with an escaped comment // wow,/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn,Start,35
+line:/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn-Start-20,Here's an option with an escaped backslash \,/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn,Start,36
+line:/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn-Start-21,Here's some TMP-style styling with a color code: <color=#fff>wow</color>,/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn,Start,37
+line:/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn-Start-22,Here's a url: http://github.com/YarnSpinnerTool,/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn,Start,38
+line:/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn-Start-23,Here's some markup: [a]hello[/a],/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn,Start,39
+line:/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn-Start-24,Here's some escaped markup: \[a\]hello\[/a\],/Users/kalexmills/repos/personal/yarn/testdata/Escaping.yarn,Start,40

@@ -1,12 +1,12 @@
 id,text,file,node,lineNumber
-line:/Users/DrJosh9000/repos/personal/yarn/testdata/InlineExpressions.yarn-Start-0,Number: {0},/Users/DrJosh9000/repos/personal/yarn/testdata/InlineExpressions.yarn,Start,11
-line:/Users/DrJosh9000/repos/personal/yarn/testdata/InlineExpressions.yarn-Start-1,Expression: {0},/Users/DrJosh9000/repos/personal/yarn/testdata/InlineExpressions.yarn,Start,12
-line:/Users/DrJosh9000/repos/personal/yarn/testdata/InlineExpressions.yarn-Start-2,String: {0},/Users/DrJosh9000/repos/personal/yarn/testdata/InlineExpressions.yarn,Start,13
-line:/Users/DrJosh9000/repos/personal/yarn/testdata/InlineExpressions.yarn-Start-3,Bool: {0},/Users/DrJosh9000/repos/personal/yarn/testdata/InlineExpressions.yarn,Start,14
-line:/Users/DrJosh9000/repos/personal/yarn/testdata/InlineExpressions.yarn-Start-4,Variable: {0},/Users/DrJosh9000/repos/personal/yarn/testdata/InlineExpressions.yarn,Start,15
-line:/Users/DrJosh9000/repos/personal/yarn/testdata/InlineExpressions.yarn-Start-5,{0} is great!,/Users/DrJosh9000/repos/personal/yarn/testdata/InlineExpressions.yarn,Start,18
-line:/Users/DrJosh9000/repos/personal/yarn/testdata/InlineExpressions.yarn-Start-6,Option Number: {0},/Users/DrJosh9000/repos/personal/yarn/testdata/InlineExpressions.yarn,Start,21
-line:/Users/DrJosh9000/repos/personal/yarn/testdata/InlineExpressions.yarn-Start-7,Option Expression: {0},/Users/DrJosh9000/repos/personal/yarn/testdata/InlineExpressions.yarn,Start,22
-line:/Users/DrJosh9000/repos/personal/yarn/testdata/InlineExpressions.yarn-Start-8,Option String: {0},/Users/DrJosh9000/repos/personal/yarn/testdata/InlineExpressions.yarn,Start,23
-line:/Users/DrJosh9000/repos/personal/yarn/testdata/InlineExpressions.yarn-Start-9,Option Bool: {0},/Users/DrJosh9000/repos/personal/yarn/testdata/InlineExpressions.yarn,Start,24
-line:/Users/DrJosh9000/repos/personal/yarn/testdata/InlineExpressions.yarn-Start-10,Option Variable: {0},/Users/DrJosh9000/repos/personal/yarn/testdata/InlineExpressions.yarn,Start,25
+line:/Users/kalexmills/repos/personal/yarn/testdata/InlineExpressions.yarn-Start-0,Number: {0},/Users/kalexmills/repos/personal/yarn/testdata/InlineExpressions.yarn,Start,11
+line:/Users/kalexmills/repos/personal/yarn/testdata/InlineExpressions.yarn-Start-1,Expression: {0},/Users/kalexmills/repos/personal/yarn/testdata/InlineExpressions.yarn,Start,12
+line:/Users/kalexmills/repos/personal/yarn/testdata/InlineExpressions.yarn-Start-2,String: {0},/Users/kalexmills/repos/personal/yarn/testdata/InlineExpressions.yarn,Start,13
+line:/Users/kalexmills/repos/personal/yarn/testdata/InlineExpressions.yarn-Start-3,Bool: {0},/Users/kalexmills/repos/personal/yarn/testdata/InlineExpressions.yarn,Start,14
+line:/Users/kalexmills/repos/personal/yarn/testdata/InlineExpressions.yarn-Start-4,Variable: {0},/Users/kalexmills/repos/personal/yarn/testdata/InlineExpressions.yarn,Start,15
+line:/Users/kalexmills/repos/personal/yarn/testdata/InlineExpressions.yarn-Start-5,{0} is great!,/Users/kalexmills/repos/personal/yarn/testdata/InlineExpressions.yarn,Start,18
+line:/Users/kalexmills/repos/personal/yarn/testdata/InlineExpressions.yarn-Start-6,Option Number: {0},/Users/kalexmills/repos/personal/yarn/testdata/InlineExpressions.yarn,Start,21
+line:/Users/kalexmills/repos/personal/yarn/testdata/InlineExpressions.yarn-Start-7,Option Expression: {0},/Users/kalexmills/repos/personal/yarn/testdata/InlineExpressions.yarn,Start,22
+line:/Users/kalexmills/repos/personal/yarn/testdata/InlineExpressions.yarn-Start-8,Option String: {0},/Users/kalexmills/repos/personal/yarn/testdata/InlineExpressions.yarn,Start,23
+line:/Users/kalexmills/repos/personal/yarn/testdata/InlineExpressions.yarn-Start-9,Option Bool: {0},/Users/kalexmills/repos/personal/yarn/testdata/InlineExpressions.yarn,Start,24
+line:/Users/kalexmills/repos/personal/yarn/testdata/InlineExpressions.yarn-Start-10,Option Variable: {0},/Users/kalexmills/repos/personal/yarn/testdata/InlineExpressions.yarn,Start,25
