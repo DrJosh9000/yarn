@@ -158,7 +158,7 @@ func (t *StringTable) readMetadata(r io.Reader) error {
 		id := rec[0]
 		row, ok := t.Table[id]
 		if !ok {
-			return fmt.Errorf("unexpected ID in metadata table: '%s'", id)
+			return fmt.Errorf("unexpected ID in metadata table: %q", id)
 		}
 		row.Tags = rec[3:]
 	}
