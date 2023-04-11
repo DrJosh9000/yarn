@@ -16,6 +16,9 @@ package yarn
 
 import (
 	"fmt"
+	"math"
+	"math/big"
+	"math/rand"
 )
 
 // FuncMap maps function names to implementations.  It is similar to the
@@ -85,7 +88,24 @@ func defaultFuncMap() FuncMap {
 		"Number.LessThanOrEqualTo":    func(x, y float32) bool { return x <= y },
 		"String.EqualTo":              func(x, y string) bool { return x == y },
 		"String.NotEqualTo":           func(x, y string) bool { return x != y },
-		"String.Add":                  func(x, y string) string { return x + y }}
+		"String.Add":                  func(x, y string) string { return x + y },
+
+		// built-in functions from documentation.
+		"random":       func() float32 { return rand.Float32() },
+		"random_range": func(x, y int) float32 { return float32(rand.Intn(y-x) + x) },
+		"dice":         func(x int) float32 { return float32(rand.Intn(x) + 1) },
+		"round":        func(x float32) float32 { return float32(math.Round(float64(x))) },
+		"round_places": func(n float32, places uint) float32 {
+			f := new(big.Float).SetMode(big.ToNearestEven).SetPrec(places).SetFloat64(float64(n))
+			result, _ := f.Float32()
+			return result
+		},
+		"floor":   func(n float32) float32 { return float32(math.Floor(float64(n))) },
+		"ceil":    func(n float32) float32 { return float32(math.Ceil(float64(n))) },
+		"inc":     func(n float32) float32 { return float32(math.Trunc(float64(n)) + 1) },
+		"dec":     func(n float32) float32 { return float32(math.Ceil(float64(n)) - 1) },
+		"decimal": func(n float32) float32 { _, f := math.Modf(float64(n)); return float32(f) },
+	}
 }
 
 func funcAdd(x, y interface{}) (interface{}, error) {

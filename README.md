@@ -1,6 +1,6 @@
 # yarn
 
-A Go implementation of parts of Yarn Spinner 2.0.
+A Go implementation of parts of Yarn Spinner 2.3.
 
 ![Build status](https://github.com/DrJosh9000/yarn/actions/workflows/go.yml/badge.svg)
 [![Go Reference](https://pkg.go.dev/badge/github.com/DrJosh9000/yarn.svg)](https://pkg.go.dev/github.com/DrJosh9000/yarn)
@@ -27,6 +27,8 @@ commands to the handler.
   * ✅ ...including using Unicode CLDR for cardinal/ordinal form selection
     (`en-AU` not assumed!)
 * ✅ Custom markup tags are also parsed, and rendered to an `AttributedString`.
+* ✅ `visited` and `visit_count`
+* ✅ Built-in functions like `dice`, `round`, and `floor` that are mentioned in the Yarn Spinner documentation.
 
 ## Usage
 

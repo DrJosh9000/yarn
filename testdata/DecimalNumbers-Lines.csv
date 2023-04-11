@@ -1,0 +1,3 @@
+id,text,file,node,lineNumber
+line:/Users/kalexmills/repos/personal/yarn/testdata/DecimalNumbers.yarn-Start-0,Success,/Users/kalexmills/repos/personal/yarn/testdata/DecimalNumbers.yarn,Start,10
+line:/Users/kalexmills/repos/personal/yarn/testdata/DecimalNumbers.yarn-Start-1,Here's a number: {0},/Users/kalexmills/repos/personal/yarn/testdata/DecimalNumbers.yarn,Start,14

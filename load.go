@@ -16,21 +16,42 @@ package yarn
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
+	"strings"
 
 	yarnpb "github.com/DrJosh9000/yarn/bytecode"
 	"google.golang.org/protobuf/proto"
 )
 
 // LoadFiles is a convenient way of loading a compiled Yarn Spinner program and
-// string table from files in one function call. langCode should be a valid BCP
-// 47 language tag.
-func LoadFiles(programPath, stringTablePath, langCode string) (*yarnpb.Program, *StringTable, error) {
+// string table from files in one function call. When passing a programPath named
+// foo/bar/file.yarnc, LoadFiles expects that files named foo/bar/file-Lines.csv and
+// foo/bar/file-Metadata.csv are also available. langCode should be a valid BCP 47 language tag.
+func LoadFiles(programPath, langCode string) (*yarnpb.Program, *StringTable, error) {
 	prog, err := LoadProgramFile(programPath)
 	if err != nil {
 		return nil, nil, err
 	}
-	st, err := LoadStringTableFile(stringTablePath, langCode)
+	st, err := LoadStringTableFile(stringTablePath(programPath), langCode)
+	if err != nil {
+		return nil, nil, err
+	}
+	return prog, st, nil
+}
+
+// LoadFilesFS loads compiled Yarn Spinner files from the provided fs.FS.
+// See LoadFiles for more information.
+func LoadFilesFS(fsys fs.FS, programPath, langCode string) (*yarnpb.Program, *StringTable, error) {
+	yarnc, err := fs.ReadFile(fsys, programPath)
+	if err != nil {
+		return nil, nil, err
+	}
+	prog, err := unmarshalBytes(yarnc)
+	if err != nil {
+		return nil, nil, err
+	}
+	st, err := LoadStringTableFileFS(fsys, stringTablePath(programPath), langCode)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -44,9 +65,23 @@ func LoadProgramFile(programPath string) (*yarnpb.Program, error) {
 	if err != nil {
 		return nil, fmt.Errorf("reading program file: %w", err)
 	}
+	return unmarshalBytes(yarnc)
+}
+
+func unmarshalBytes(yarnc []byte) (*yarnpb.Program, error) {
 	prog := new(yarnpb.Program)
 	if err := proto.Unmarshal(yarnc, prog); err != nil {
 		return nil, fmt.Errorf("unmarshaling program: %w", err)
 	}
 	return prog, nil
+}
+
+func stringTablePath(programPath string) string {
+	base := strings.TrimSuffix(programPath, ".yarnc")
+	return fmt.Sprintf("%s-Lines.csv", base)
+}
+
+func metadataTablePath(stringTablePath string) string {
+	base := strings.TrimSuffix(stringTablePath, "-Lines.csv")
+	return fmt.Sprintf("%s-Metadata.csv", base)
 }
