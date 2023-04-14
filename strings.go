@@ -212,8 +212,8 @@ func (r *StringTableRow) parseIfNeeded() error {
 		return nil
 	}
 	filename := fmt.Sprintf("%s:%d", r.File, r.LineNumber)
-	pt := new(parsedString)
-	if err := lineParser.ParseString(filename, r.Text, pt); err != nil {
+	pt, err := lineParser.ParseString(filename, r.Text)
+	if err != nil {
 		return err
 	}
 	r.origText = r.Text
@@ -302,8 +302,7 @@ var (
 	})
 
 	// a line is a kind of string, just missing the quotes...
-	lineParser = participle.MustBuild(
-		&parsedString{},
+	lineParser = participle.MustBuild[parsedString](
 		participle.Lexer(lineLexer),
 		participle.Elide("Whitespace"),
 	)

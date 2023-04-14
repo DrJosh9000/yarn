@@ -24,8 +24,8 @@ func TestScanAttribEvents(t *testing.T) {
 	input := "[a]Hello A[/a] [b]Hello B[/b] [c][d][/c]No C, [e/]only D[/d]"
 
 	// parse input
-	pt := new(parsedString)
-	if err := lineParser.ParseString("", input, pt); err != nil {
+	pt, err := lineParser.ParseString("", input)
+	if err != nil {
 		t.Fatalf("lineParser.ParseString: %v", err)
 	}
 	// render input
