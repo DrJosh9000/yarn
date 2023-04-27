@@ -2,7 +2,7 @@
 
 A Go implementation of parts of Yarn Spinner 2.3.
 
-[![Build status](https://badge.buildkite.com/7b6f023cc8b2590b05d84ce6c15805381fd3888bc554344937.svg)](https://buildkite.com/drjosh9000/yarn)
+[![Build status](https://img.shields.io/buildkite/7b6f023cc8b2590b05d84ce6c15805381fd3888bc554344937?logo=buildkite)](https://buildkite.com/drjosh9000/yarn)
 [![Go Reference](https://pkg.go.dev/badge/github.com/DrJosh9000/yarn.svg)](https://pkg.go.dev/github.com/DrJosh9000/yarn)
 [![Go Report Card](https://goreportcard.com/badge/github.com/DrJosh9000/yarn)](https://goreportcard.com/report/github.com/DrJosh9000/yarn)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/DrJosh9000/yarn/blob/main/LICENSE)
