@@ -54,3 +54,46 @@ func (FakeDialogueHandler) NodeComplete(string) error { return nil }
 
 // DialogueComplete returns nil.
 func (FakeDialogueHandler) DialogueComplete() error { return nil }
+
+// FakeAsyncDialogueHandler implements AsyncDialogueHandler with minimal,
+// do-nothing methods. This is useful both for testing, and for satisfying the
+// interface via embedding, e.g.:
+//
+//		   type MyHandler struct {
+//			      FakeAsyncDialogueHandler
+//		   }
+//		   // MyHandler is only interested in Line and Options.
+//		   func (m MyHandler) Line(line Line) { ... }
+//		   func (m MyHandler) Options(options []Option) { ... }
+//		   // All the other AsyncDialogueHandler methods provided by
+//	    // FakeAsyncDialogueHandler.
+type FakeAsyncDialogueHandler struct{}
+
+// NodeStart returns nil.
+func (FakeAsyncDialogueHandler) NodeStart(string) error {
+	return nil
+}
+
+// PrepareForLines returns nil.
+func (FakeAsyncDialogueHandler) PrepareForLines([]string) error {
+	return nil
+}
+
+// Line does nothing.
+func (FakeAsyncDialogueHandler) Line(Line) {}
+
+// Options does nothing.
+func (FakeAsyncDialogueHandler) Options([]Option) {}
+
+// Command does nothing.
+func (FakeAsyncDialogueHandler) Command(string) {}
+
+// NodeComplete returns nil.
+func (FakeAsyncDialogueHandler) NodeComplete(string) error {
+	return nil
+}
+
+// DialogueComplete returns nil.
+func (FakeAsyncDialogueHandler) DialogueComplete() error {
+	return nil
+}
