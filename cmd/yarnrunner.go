@@ -21,8 +21,7 @@
 // Quick usage from the root of the repo:
 //
 //	go run -tags example cmd/yarnrunner.go \
-//	    --program=testdata/Example.yarn.yarnc \
-//	    --strings=testdata/Example.yarn.csv
+//	    --program=testdata/Example.yarn.yarnc
 //
 // The "example" build tag is used to prevent this being installed to ~/go/bin
 // if you use the go get command. If for some reason you want to install it to
@@ -39,12 +38,11 @@ import (
 
 func main() {
 	yarncFilename := flag.String("program", "", "File name of program (e.g. Example.yarn.yarnc)")
-	csvFilename := flag.String("strings", "", "File name of string table (e.g. Example.yarn.csv)")
 	startNode := flag.String("start", "Start", "Name of the node to run")
 	langCode := flag.String("lang", "en-AU", "Language tag (BCP 47)")
 	flag.Parse()
 
-	program, stringTable, err := yarn.LoadFiles(*yarncFilename, *csvFilename, *langCode)
+	program, stringTable, err := yarn.LoadFiles(*yarncFilename, *langCode)
 	if err != nil {
 		log.Fatalf("Loading files: %v", err)
 	}
