@@ -30,9 +30,9 @@ commands to the handler.
 * ✅ `visited` and `visit_count`
 * ✅ Built-in functions like `dice`, `round`, and `floor` that are mentioned in the Yarn Spinner documentation.
 
-## Usage
+## Basic Usage
 
-1. Compile your `.yarn` file. You can probably get the compiled output from a  
+1. Compile your `.yarn` file. You can probably get the compiled output from a
    Unity project, or you can compile without using Unity with a tool like the
    [Yarn Spinner Console](https://github.com/YarnSpinnerTool/YarnSpinner-Console):
 
@@ -75,7 +75,7 @@ commands to the handler.
        return choice, nil
    }
 
-   // ... and also the other methods. 
+   // ... and also the other methods.
    // Alternatively you can embed yarn.FakeDialogueHandler in your handler.
    ```
 
@@ -85,12 +85,12 @@ commands to the handler.
 
    ```go
    package main
-   
+
    import "github.com/DrJosh9000/yarn"
-   
+
    func main() {
        // Load the files (error handling omitted for brevity):
-       program, stringTable, _ := yarn.LoadFiles("Example.yarn.yarnc", "Example.yarn.csv", "en-AU")
+       program, stringTable, _ := yarn.LoadFiles("Example.yarn.yarnc", "en-AU")
 
        // Set up your DialogueHandler and the VirtualMachine:
        myHandler := &MyHandler{
@@ -99,9 +99,9 @@ commands to the handler.
        vm := &yarn.VirtualMachine{
            Program: program,
            Handler: myHandler,
-           Vars: make(yarn.MapVariableStorage), // or your own VariableStorage implementation
+           Vars:    make(yarn.MapVariableStorage), // or your own VariableStorage implementation
            FuncMap: yarn.FuncMap{ // this is optional
-               "last_value": func(x ...interface{}) interface{} {
+               "last_value": func(x ...any) any {
                    return x[len(x)-1]
                },
                // or your own custom functions!
@@ -115,6 +115,82 @@ commands to the handler.
 
 See `cmd/yarnrunner.go` for a complete example.
 
+## Async usage
+
+To avoid the VM delivering the lines, options, and commands all at once,
+your `DialogueHandler` implementation is allowed to block execution of the VM
+goroutine - for example, using a channel operation.
+
+However, in a typical game, each line or option would be associated with two
+distinct operations: showing the line/option to the player, and hiding it later
+on in response to user input.
+
+To make this easier, `AsyncAdapter` can handle blocking the VM for you.
+
+```mermaid
+sequenceDiagram
+  yarn.VirtualMachine->>+yarn.AsyncAdapter: Line
+  yarn.AsyncAdapter->>+myHandler: Line
+  myHandler->>-gameEngine: showDialogue
+  Note right of myHandler: (time passes)
+  gameEngine->>+myHandler: Update
+  myHandler->>gameEngine: hideDialogue
+  myHandler->>-yarn.AsyncAdapter: Go
+  yarn.AsyncAdapter-->>-yarn.VirtualMachine: (return)
+```
+
+Use
+`AsyncAdapter` as the `VirtualMachine.Handler`, and create the `AsyncAdapter`
+with an `AsyncDialogueHandler`:
+
+```go
+// MyHandler should now implement yarn.AsyncDialogueHandler.
+type MyHandler struct {
+    stringTable *yarn.StringTable
+
+    dialogueDisplay Component
+
+    // Maintain a reference to the AsyncAdapter in order to call Go on it
+    // in response to user input.
+    // (It doesn't have to be stored in the handler, there are probably better
+    // places in a real project. This is just an example.)
+    asyncAdapter *yarn.AsyncAdapter
+}
+
+// Line is called by AsyncAdapter from the goroutine running VirtualMachine.Run.
+// The AsyncAdapter pauses the VM.
+func (m *MyHandler) Line(line yarn.Line) {
+    text, _ := m.stringTable.Render(line)
+    m.dialogueDisplay.Show(text)
+}
+
+// Update is called on every tick by the game engine, which is a separate
+// goroutine to the one the Yarn virtual machine is running in.
+func (m *MyHandler) Update() error {
+    //...
+
+    if m.dialogueDisplay.Visible() && inpututil.IsKeyJustPressed(ebiten.KeyEnter) {
+        // Hide the dialogue display.
+        m.dialogueDisplay.Hide()
+
+        // Calling AsyncAdapter.Go un-pauses the VM.
+        m.asyncAdapter.Go()
+    }
+    //...
+}
+
+// --- Setup ---
+
+myHandler := &MyHandler{}
+myHandler.asyncAdapter = yarn.NewAsyncAdapter(myHandler)
+
+vm := &yarn.VirtualMachine{
+    Program: program,
+    Handler: myHandler.asyncAdapter,
+    ...
+}
+```
+
 ## Usage notes
 
 Note that using an earlier Yarn Spinner compiler will result in some unusual
@@ -126,7 +202,7 @@ If you need the tags for a node, you can read these from the `Node` protobuf
 message directly. Source text of a `rawText` node can be looked up manually:
 
 ```go
-prog, st, _ := yarn.LoadFiles("testdata/Example.yarn.yarnc", "testdata/Example.yarn.csv", "en")
+prog, st, _ := yarn.LoadFiles("testdata/Example.yarn.yarnc", "en")
 node := prog.Nodes["LearnMore"]
 // Tags for the LearnMore node:
 fmt.Println(node.Tags)
@@ -134,64 +210,6 @@ fmt.Println(node.Tags)
 fmt.Println(node.SourceTextStringID)
 // Source text is in the string table:
 fmt.Println(st.Table[node.SourceTextStringID].Text)
-```
-
-In a typical game, `vm.Run` would happen in a separate goroutine. To avoid the
-VM delivering all the lines, options, and commands at once, your
-`DialogueHandler` implementation is allowed to block execution of the VM
-goroutine - for example, using a channel operation:
-
-```go
-type MyHandler struct {
-    stringTable *yarn.StringTable
-
-    dialogueDisplay Component
-
-    // next is used to block Line from returning until the player is ready for
-    // more tasty, tasty content.
-    next chan struct{}
-
-    // waiting tracks whether the game is waiting for player input.
-    // It is guarded by a mutex since it is changed by two different
-    // goroutines.
-    waitingMu sync.Mutex
-    waiting   bool
-}
-
-func (m *MyHandler) setWaiting(w bool) {
-    m.waitingMu.Lock()
-    m.waiting = w
-    m.waitingMu.Unlock()
-}
-
-// Line is called from the goroutine running VirtualMachine.Run.
-func (m *MyHandler) Line(line yarn.Line) error {
-    text, _ := m.stringTable.Render(line)
-    m.dialogueDisplay.Show(text)
-    
-    // Go into waiting-for-player-input state
-    m.setWaiting(true)
-
-    // Recieve on m.next, which blocks until another goroutine sends on it.
-    <-m.next
-    return nil
-}
-
-// Update is called on every tick by the game engine, which is a separate
-// goroutine to the one the virtual machine is running in.
-func (m *MyHandler) Update() error {
-    //...
-    if m.waiting && inpututil.IsKeyJustPressed(ebiten.KeyEnter) {
-        // Hide the dialogue display.
-        m.dialogueDisplay.Hide()
-        // No longer waiting for player input.
-        m.setWaiting(false)
-        // Send on m.next, which unblocks the call to Line.
-        // Do this after setting m.waiting to false.
-       m.next <- struct{}{}
-    }
-    //...
-}
 ```
 
 ## Licence
