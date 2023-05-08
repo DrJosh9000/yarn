@@ -59,10 +59,10 @@ func (s VMState) String() string {
 	return fmt.Sprintf("(invalid VMState %d)", s)
 }
 
-// VMStateMismatchErr is returned when AsyncAdapter is told to do something (either
-// by the user calling Go, GoWithChoice, or Abort, or the VM calling a
-// DialogueHandler method) but this requires AsyncAdapter to be in a different state
-// than the state it is in.
+// VMStateMismatchErr is returned when AsyncAdapter is told to do something
+// (either by the user calling Go, GoWithChoice, or Abort, or the VM calling a
+// DialogueHandler method) but this requires AsyncAdapter to be in a different
+// state than the state it is in.
 type VMStateMismatchErr struct {
 	// The VM was in state Got, but we wanted it to be in state Want in order
 	// to change it to state Next.
@@ -75,9 +75,8 @@ func (e VMStateMismatchErr) Error() string {
 
 // AsyncAdapter is a DialogueHandler that exposes an interface that is similar
 // to the mainline YarnSpinner VM dialogue handler. Instead of manually blocking
-// inside the DialogueHandler Line, Options, and Command callbacks, AsyncAdapter
-// does this for you, until you call Go, GoWithChoice, or Abort (as
-// appropriate).
+// inside the DialogueHandler callbacks, AsyncAdapter does this for you, until
+// you call Go, GoWithChoice, or Abort (as appropriate).
 type AsyncAdapter struct {
 	state   atomic.Int32
 	handler AsyncDialogueHandler
@@ -90,9 +89,9 @@ func NewAsyncAdapter(h AsyncDialogueHandler) *AsyncAdapter {
 		handler: h,
 		// The user might call Go from within their handler's Line method
 		// (or however many other ways to try to continue the VM immediately).
-		// If ch was unbuffered, calling Go would wait forever trying to send on
-		// the channel, because AsyncAdapter only receives on ch after their method
-		// returns.
+		// If msgCh was unbuffered, calling Go would wait forever trying to send
+		// on the channel, because AsyncAdapter only receives on msgCh after
+		// their method returns.
 		msgCh: make(chan asyncMsg, 1),
 	}
 }
@@ -105,8 +104,8 @@ func (a *AsyncAdapter) State() VMState {
 func (a *AsyncAdapter) stateTransition(old, new int32) error {
 	if !a.state.CompareAndSwap(old, new) {
 		// This races (between CAS and a.State, something else could switch the
-		// state around). While I try to make the error maximally useful
-		// for debugging ... YOLO?
+		// state around). While I try to make the error maximally useful for
+		// debugging ... YOLO?
 		return VMStateMismatchErr{
 			Got:  a.State(),
 			Want: VMState(old),
@@ -117,7 +116,8 @@ func (a *AsyncAdapter) stateTransition(old, new int32) error {
 }
 
 // Go will continue the VM after it has delivered any event (other than
-// Options). If the VM is not waiting for an event, an error will be returned.
+// Options). If the VM is not paused following any event other than Options, an
+// error will be returned.
 func (a *AsyncAdapter) Go() error {
 	if err := a.stateTransition(VMStatePaused, VMStateRunning); err != nil {
 		return err
@@ -127,7 +127,8 @@ func (a *AsyncAdapter) Go() error {
 }
 
 // GoWithChoice will continue the VM after it has delivered an Options event.
-// Pass
+// Pass the ID of the chosen option. If the VM is not paused following an
+// Options event, an error will be returned.
 func (a *AsyncAdapter) GoWithChoice(id int) error {
 	if err := a.stateTransition(VMStatePausedOptions, VMStateRunning); err != nil {
 		return err
@@ -139,7 +140,8 @@ func (a *AsyncAdapter) GoWithChoice(id int) error {
 // Abort stops the VM with the given error as soon as possible (either within
 // the current event, or on the next event). If a nil error is passed, Abort
 // will replace it with Stop (so that NodeComplete and DialogueComplete still
-// fire).
+// fire). If the VM is already stopped (either through Abort, or after the
+// DialogueComplete event) an error will be returned.
 func (a *AsyncAdapter) Abort(err error) error {
 	if old := a.state.Swap(VMStateStopped); old == VMStateStopped {
 		return ErrAlreadyStopped
@@ -183,16 +185,22 @@ func (a *AsyncAdapter) waitForChoice() (int, error) {
 
 // --- DialogueHandler implementation --- \\
 
-// NodeStart is called by the VM and passed through to the
-// AsyncDialogueHandler directly.
+// NodeStart is called by the VM and blocks until Go or Abort is called.
 func (a *AsyncAdapter) NodeStart(nodeName string) error {
-	return a.handler.NodeStart(nodeName)
+	if err := a.stateTransition(VMStateRunning, VMStatePaused); err != nil {
+		return err
+	}
+	a.handler.NodeStart(nodeName)
+	return a.waitForGo()
 }
 
-// PrepareForLines is called by the VM and passed through to the
-// AsyncDialogueHandler directly.
+// PrepareForLines is called by the VM and blocks until Go or Abort is called.
 func (a *AsyncAdapter) PrepareForLines(lineIDs []string) error {
-	return a.handler.PrepareForLines(lineIDs)
+	if err := a.stateTransition(VMStateRunning, VMStatePaused); err != nil {
+		return err
+	}
+	a.handler.PrepareForLines(lineIDs)
+	return a.waitForGo()
 }
 
 // Line is called by the VM and blocks until Go or Abort is called.
@@ -222,16 +230,23 @@ func (a *AsyncAdapter) Command(command string) error {
 	return a.waitForGo()
 }
 
-// NodeComplete is called by the VM and passed through to the
-// AsyncDialogueHandler directly.
+// NodeComplete is called by the VM and blocks until Go or Abort is called.
 func (a *AsyncAdapter) NodeComplete(nodeName string) error {
-	return a.handler.NodeComplete(nodeName)
+	if err := a.stateTransition(VMStateRunning, VMStatePaused); err != nil {
+		return err
+	}
+	a.handler.NodeComplete(nodeName)
+	return a.waitForGo()
+
 }
 
-// DialogueComplete is called by the VM and passed through to the
-// AsyncDialogueHandler directly.
+// DialogueComplete is called by the VM and blocks until Go or Abort is called.
 func (a *AsyncAdapter) DialogueComplete() error {
-	return a.handler.DialogueComplete()
+	if err := a.stateTransition(VMStateRunning, VMStatePaused); err != nil {
+		return err
+	}
+	a.handler.DialogueComplete()
+	return a.waitForGo()
 }
 
 // --- AsyncAdapter messages --- \\

@@ -31,12 +31,22 @@ type syncAdapter struct {
 	t  *testing.T
 }
 
-func (s *syncAdapter) NodeStart(nodeName string) error {
-	return s.dh.NodeStart(nodeName)
+func (s *syncAdapter) NodeStart(nodeName string) {
+	if err := s.dh.NodeStart(nodeName); err != nil {
+		s.t.Errorf("syncAdapter.DialogueHandler.NodeStart(%q) = %v", nodeName, err)
+	}
+	if err := s.aa.Go(); err != nil {
+		s.t.Errorf("syncAdapter.AsyncAdapter.Go() = %v", err)
+	}
 }
 
-func (s *syncAdapter) PrepareForLines(lineIDs []string) error {
-	return s.dh.PrepareForLines(lineIDs)
+func (s *syncAdapter) PrepareForLines(lineIDs []string) {
+	if err := s.dh.PrepareForLines(lineIDs); err != nil {
+		s.t.Errorf("syncAdapter.DialogueHandler.PrepareForLines(%q) = %v", lineIDs, err)
+	}
+	if err := s.aa.Go(); err != nil {
+		s.t.Errorf("syncAdapter.AsyncAdapter.Go() = %v", err)
+	}
 }
 
 func (s *syncAdapter) Line(line Line) {
@@ -67,12 +77,22 @@ func (s *syncAdapter) Command(command string) {
 	}
 }
 
-func (s *syncAdapter) NodeComplete(nodeName string) error {
-	return s.dh.NodeComplete(nodeName)
+func (s *syncAdapter) NodeComplete(nodeName string) {
+	if err := s.dh.NodeComplete(nodeName); err != nil {
+		s.t.Errorf("syncAdapter.DialogueHandler.NodeComplete(%q) = %v", nodeName, err)
+	}
+	if err := s.aa.Go(); err != nil {
+		s.t.Errorf("syncAdapter.AsyncAdapter.Go() = %v", err)
+	}
 }
 
-func (s *syncAdapter) DialogueComplete() error {
-	return s.dh.DialogueComplete()
+func (s *syncAdapter) DialogueComplete() {
+	if err := s.dh.DialogueComplete(); err != nil {
+		s.t.Errorf("syncAdapter.DialogueHandler.DialogueComplete() = %v", err)
+	}
+	if err := s.aa.Go(); err != nil {
+		s.t.Errorf("syncAdapter.AsyncAdapter.Go() = %v", err)
+	}
 }
 
 func TestAllTestPlansAsync(t *testing.T) {
@@ -191,9 +211,9 @@ func (d *decoupledAsyncHandler) Command(command string) {
 	}
 }
 
-func (d *decoupledAsyncHandler) DialogueComplete() error {
+func (d *decoupledAsyncHandler) DialogueComplete() {
 	close(d.eventCh)
-	return nil
+	d.AsyncAdapter.Go()
 }
 
 func TestAsyncAdapterWithDecoupledHandler(t *testing.T) {
@@ -207,6 +227,7 @@ func TestAsyncAdapterWithDecoupledHandler(t *testing.T) {
 		eventCh: make(chan decoupledEvent),
 	}
 	aa := NewAsyncAdapter(dh)
+	dh.AsyncAdapter = aa
 
 	vm := &VirtualMachine{
 		Program: prog,
@@ -233,25 +254,24 @@ func TestAsyncAdapterWithDecoupledHandler(t *testing.T) {
 // immediateAsyncHandler calls Go and GoWithChoice within each event.
 type immediateAsyncHandler struct {
 	FakeAsyncDialogueHandler
-	aa *AsyncAdapter
-	t  *testing.T
+	t *testing.T
 }
 
 func (i *immediateAsyncHandler) Line(Line) {
-	if err := i.aa.Go(); err != nil {
+	if err := i.AsyncAdapter.Go(); err != nil {
 		i.t.Errorf("AsyncAdapter.Go() = %v", err)
 	}
 }
 
 func (i *immediateAsyncHandler) Options(options []Option) {
 	id := options[0].ID
-	if err := i.aa.GoWithChoice(id); err != nil {
+	if err := i.AsyncAdapter.GoWithChoice(id); err != nil {
 		i.t.Errorf("AsyncAdapter.GoWithChoice(%d) = %v", id, err)
 	}
 }
 
 func (i *immediateAsyncHandler) Command(string) {
-	if err := i.aa.Go(); err != nil {
+	if err := i.AsyncAdapter.Go(); err != nil {
 		i.t.Errorf("AsyncAdapter.Go() = %v", err)
 	}
 }
@@ -263,9 +283,11 @@ func TestAsyncAdapterWithImmediateHandler(t *testing.T) {
 		t.Fatalf("LoadFiles(%q, en) = error %v", yarnc, err)
 	}
 
-	ah := &immediateAsyncHandler{t: t}
+	ah := &immediateAsyncHandler{
+		t: t,
+	}
 	aa := NewAsyncAdapter(ah)
-	ah.aa = aa
+	ah.AsyncAdapter = aa
 
 	vm := &VirtualMachine{
 		Program: prog,
@@ -285,8 +307,7 @@ func TestAsyncAdapterWithImmediateHandler(t *testing.T) {
 // ones.
 type badAsyncHandler struct {
 	FakeAsyncDialogueHandler
-	aa *AsyncAdapter
-	t  *testing.T
+	t *testing.T
 }
 
 func (b *badAsyncHandler) Line(Line) {
@@ -295,11 +316,11 @@ func (b *badAsyncHandler) Line(Line) {
 		Want: VMStatePausedOptions,
 		Next: VMStateRunning,
 	}
-	if diff := cmp.Diff(b.aa.GoWithChoice(6), want); diff != "" {
+	if diff := cmp.Diff(b.AsyncAdapter.GoWithChoice(6), want); diff != "" {
 		b.t.Errorf("AsyncAdapter.GoWithChoice(6) error diff (-got +want):\n%s", diff)
 	}
 	// call Go to proceed, otherwise it hangs (it's waiting for Go, duh)
-	if err := b.aa.Go(); err != nil {
+	if err := b.AsyncAdapter.Go(); err != nil {
 		b.t.Errorf("AsyncAdapter.Go() = %v", err)
 	}
 }
@@ -310,12 +331,12 @@ func (b *badAsyncHandler) Options(options []Option) {
 		Want: VMStatePaused,
 		Next: VMStateRunning,
 	}
-	if diff := cmp.Diff(b.aa.Go(), want); diff != "" {
+	if diff := cmp.Diff(b.AsyncAdapter.Go(), want); diff != "" {
 		b.t.Errorf("AsyncAdapter.Go() error diff (-got +want):\n%s", diff)
 	}
 	// call GoWithChoice to proceed, otherwise it hangs
 	choice := options[0].ID
-	if err := b.aa.GoWithChoice(choice); err != nil {
+	if err := b.AsyncAdapter.GoWithChoice(choice); err != nil {
 		b.t.Errorf("AsyncAdapter.GoWithChoice(%d) = %v", choice, err)
 	}
 }
@@ -326,11 +347,11 @@ func (b *badAsyncHandler) Command(string) {
 		Want: VMStatePausedOptions,
 		Next: VMStateRunning,
 	}
-	if diff := cmp.Diff(b.aa.GoWithChoice(0), want); diff != "" {
+	if diff := cmp.Diff(b.AsyncAdapter.GoWithChoice(0), want); diff != "" {
 		b.t.Errorf("AsyncAdapter.GoWithChoice(0) error diff (-got +want):\n%s", diff)
 	}
 	// pass Go, collect $200
-	if err := b.aa.Go(); err != nil {
+	if err := b.AsyncAdapter.Go(); err != nil {
 		b.t.Errorf("AsyncAdapter.Go() = %v", err)
 	}
 }
@@ -344,7 +365,7 @@ func TestAsyncAdapterWithBadHandler(t *testing.T) {
 
 	bh := &badAsyncHandler{t: t}
 	aa := NewAsyncAdapter(bh)
-	bh.aa = aa
+	bh.AsyncAdapter = aa
 
 	vm := &VirtualMachine{
 		Program: prog,
@@ -365,24 +386,23 @@ var errDummy = errors.New("abort! abort!")
 // abortAsyncHandler calls Abort within each event.
 type abortAsyncHandler struct {
 	FakeAsyncDialogueHandler
-	aa *AsyncAdapter
-	t  *testing.T
+	t *testing.T
 }
 
 func (a *abortAsyncHandler) Line(Line) {
-	if err := a.aa.Abort(errDummy); err != nil {
+	if err := a.AsyncAdapter.Abort(errDummy); err != nil {
 		a.t.Errorf("AsyncAdapter.Abort(errDummy) = %v", err)
 	}
 }
 
 func (a *abortAsyncHandler) Options(options []Option) {
-	if err := a.aa.Abort(errDummy); err != nil {
+	if err := a.AsyncAdapter.Abort(errDummy); err != nil {
 		a.t.Errorf("AsyncAdapter.Abort(errDummy) = %v", err)
 	}
 }
 
 func (a *abortAsyncHandler) Command(string) {
-	if err := a.aa.Abort(errDummy); err != nil {
+	if err := a.AsyncAdapter.Abort(errDummy); err != nil {
 		a.t.Errorf("AsyncAdapter.Abort(errDummy) = %v", err)
 	}
 }
@@ -396,7 +416,7 @@ func TestAsyncAdapterWithAbortHandler(t *testing.T) {
 
 	bh := &abortAsyncHandler{t: t}
 	aa := NewAsyncAdapter(bh)
-	bh.aa = aa
+	bh.AsyncAdapter = aa
 
 	vm := &VirtualMachine{
 		Program: prog,

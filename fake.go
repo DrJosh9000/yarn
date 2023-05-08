@@ -17,8 +17,8 @@ package yarn
 import "errors"
 
 // FakeDialogueHandler implements DialogueHandler with minimal, do-nothing
-// methods. This is useful both for testing, and for satisfying the interface
-// via embedding, e.g.:
+// methods. This is useful both for testing, and for satisfying the
+// DialogueHandler via embedding, e.g.:
 //
 //	   type MyHandler struct {
 //		      FakeDialogueHandler
@@ -55,9 +55,9 @@ func (FakeDialogueHandler) NodeComplete(string) error { return nil }
 // DialogueComplete returns nil.
 func (FakeDialogueHandler) DialogueComplete() error { return nil }
 
-// FakeAsyncDialogueHandler implements AsyncDialogueHandler with minimal,
-// do-nothing methods. This is useful both for testing, and for satisfying the
-// interface via embedding, e.g.:
+// FakeAsyncDialogueHandler implements AsyncDialogueHandler with minimal
+// methods that immediately continue the VM. This is useful both for testing,
+// and for satisfying the AsyncDialogueHandler interface via embedding, e.g.:
 //
 //		   type MyHandler struct {
 //			      FakeAsyncDialogueHandler
@@ -66,34 +66,37 @@ func (FakeDialogueHandler) DialogueComplete() error { return nil }
 //		   func (m MyHandler) Line(line Line) { ... }
 //		   func (m MyHandler) Options(options []Option) { ... }
 //		   // All the other AsyncDialogueHandler methods provided by
-//	    // FakeAsyncDialogueHandler.
-type FakeAsyncDialogueHandler struct{}
-
-// NodeStart returns nil.
-func (FakeAsyncDialogueHandler) NodeStart(string) error {
-	return nil
+//	       // FakeAsyncDialogueHandler.
+//
+// Note that FakeAsyncDialogueHandler needs a reference to the AsyncAdapter (in
+// order to call Go or GoWithChoice).
+type FakeAsyncDialogueHandler struct {
+	AsyncAdapter *AsyncAdapter
 }
 
-// PrepareForLines returns nil.
-func (FakeAsyncDialogueHandler) PrepareForLines([]string) error {
-	return nil
+// NodeStart calls AsyncAdapter.Go.
+func (f FakeAsyncDialogueHandler) NodeStart(string) { f.AsyncAdapter.Go() }
+
+// PrepareForLines calls AsyncAdapter.Go.
+func (f FakeAsyncDialogueHandler) PrepareForLines([]string) { f.AsyncAdapter.Go() }
+
+// Line calls AsyncAdapter.Go.
+func (f FakeAsyncDialogueHandler) Line(Line) { f.AsyncAdapter.Go() }
+
+// Options calls AsyncAdapter.GoWithChoice with the ID of the first option,
+// or AsyncAdapter.Abort if there are no options.
+func (f FakeAsyncDialogueHandler) Options(options []Option) {
+	if len(options) == 0 {
+		f.AsyncAdapter.Abort(errors.New("no options delivered"))
+	}
+	f.AsyncAdapter.GoWithChoice(options[0].ID)
 }
 
-// Line does nothing.
-func (FakeAsyncDialogueHandler) Line(Line) {}
+// Command calls AsyncAdapter.Go.
+func (f FakeAsyncDialogueHandler) Command(string) { f.AsyncAdapter.Go() }
 
-// Options does nothing.
-func (FakeAsyncDialogueHandler) Options([]Option) {}
+// NodeComplete calls AsyncAdapter.Go.
+func (f FakeAsyncDialogueHandler) NodeComplete(string) { f.AsyncAdapter.Go() }
 
-// Command does nothing.
-func (FakeAsyncDialogueHandler) Command(string) {}
-
-// NodeComplete returns nil.
-func (FakeAsyncDialogueHandler) NodeComplete(string) error {
-	return nil
-}
-
-// DialogueComplete returns nil.
-func (FakeAsyncDialogueHandler) DialogueComplete() error {
-	return nil
-}
+// DialogueComplete calls AsyncAdapter.Go.
+func (f FakeAsyncDialogueHandler) DialogueComplete() { f.AsyncAdapter.Go() }
