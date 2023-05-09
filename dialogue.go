@@ -70,3 +70,34 @@ type DialogueHandler interface {
 	// DialogueComplete is called when the dialogue as a whole is complete.
 	DialogueComplete() error
 }
+
+// AsyncDialogueHandler receives events from AsyncAdapter. Unlike
+// DialogueHandler, during each event the VM execution is paused automatically
+// until Go, GoWithChoice, or Abort is called.
+type AsyncDialogueHandler interface {
+	// NodeStart is called when a node has begun executing. It is passed the
+	// name of the node.
+	NodeStart(nodeName string)
+
+	// PrepareForLines is called when the dialogue system anticipates that it
+	// will deliver some lines. Note that not every line prepared may end up
+	// being run.
+	PrepareForLines(lineIDs []string)
+
+	// Line is called when the dialogue system runs a line of dialogue.
+	Line(line Line)
+
+	// Options is called to deliver a set of options to the game. The player
+	// should choose one of the options.
+	Options(options []Option)
+
+	// Command is called when the dialogue system runs a command.
+	Command(command string)
+
+	// NodeComplete is called when a node has completed execution. It is passed
+	// the name of the node.
+	NodeComplete(nodeName string)
+
+	// DialogueComplete is called when the dialogue as a whole is complete.
+	DialogueComplete()
+}
