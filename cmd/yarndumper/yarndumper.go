@@ -19,7 +19,7 @@
 //
 // Quick usage from the root of the repo:
 //
-//	go run -tags example cmd/yarndumper.go testdata/Example.yarn.yarnc
+//	go run -tags example cmd/yarndumper/yarndumper.go testdata/Example.yarn.yarnc
 //
 // The "example" build tag is used to prevent this being installed to ~/go/bin
 // if you use the go get command. If for some reason you want to install it to
