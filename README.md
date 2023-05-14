@@ -99,7 +99,7 @@ commands to the handler.
        vm := &yarn.VirtualMachine{
            Program: program,
            Handler: myHandler,
-           Vars:    make(yarn.MapVariableStorage), // or your own VariableStorage implementation
+           Vars:    yarn.NewMapVariableStorage(), // or your own VariableStorage implementation
            FuncMap: yarn.FuncMap{ // this is optional
                "last_value": func(x ...any) any {
                    return x[len(x)-1]
