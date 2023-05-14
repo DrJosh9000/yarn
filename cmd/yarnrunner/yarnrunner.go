@@ -20,8 +20,8 @@
 //
 // Quick usage from the root of the repo:
 //
-//	go run -tags example cmd/yarnrunner.go \
-//	    --program=testdata/Example.yarn.yarnc
+//	go run -tags example cmd/yarnrunner/yarnrunner.go \
+//	    --program=cmd/yarnrunner/terminal.yarn.yarnc
 //
 // The "example" build tag is used to prevent this being installed to ~/go/bin
 // if you use the go get command. If for some reason you want to install it to
