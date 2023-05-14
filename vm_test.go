@@ -47,7 +47,7 @@ func TestAllTestPlans(t *testing.T) {
 			vm := &VirtualMachine{
 				Program: prog,
 				Handler: testplan,
-				Vars:    make(MapVariableStorage),
+				Vars:    NewMapVariableStorage(),
 				FuncMap: FuncMap{
 					// Used by various
 					"assert": func(x interface{}) error {

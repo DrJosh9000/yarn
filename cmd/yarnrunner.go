@@ -52,7 +52,7 @@ func main() {
 		Handler: &dialogueHandler{
 			stringTable: stringTable,
 		},
-		Vars: make(yarn.MapVariableStorage),
+		Vars: yarn.NewMapVariableStorage(),
 	}
 	if err := vm.Run(*startNode); err != nil {
 		log.Printf("Yarn VM error: %v", err)

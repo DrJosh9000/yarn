@@ -126,7 +126,7 @@ func TestAllTestPlansAsync(t *testing.T) {
 			vm := &VirtualMachine{
 				Program: prog,
 				Handler: sa.aa,
-				Vars:    make(MapVariableStorage),
+				Vars:    NewMapVariableStorage(),
 				FuncMap: FuncMap{
 					// Used by various
 					"assert": func(x interface{}) error {
@@ -232,7 +232,7 @@ func TestAsyncAdapterWithDecoupledHandler(t *testing.T) {
 	vm := &VirtualMachine{
 		Program: prog,
 		Handler: aa,
-		Vars:    make(MapVariableStorage),
+		Vars:    NewMapVariableStorage(),
 	}
 	if traceOutput {
 		vm.TraceLogf = t.Logf
@@ -292,7 +292,7 @@ func TestAsyncAdapterWithImmediateHandler(t *testing.T) {
 	vm := &VirtualMachine{
 		Program: prog,
 		Handler: aa,
-		Vars:    make(MapVariableStorage),
+		Vars:    NewMapVariableStorage(),
 	}
 	if traceOutput {
 		vm.TraceLogf = t.Logf
@@ -370,7 +370,7 @@ func TestAsyncAdapterWithBadHandler(t *testing.T) {
 	vm := &VirtualMachine{
 		Program: prog,
 		Handler: aa,
-		Vars:    make(MapVariableStorage),
+		Vars:    NewMapVariableStorage(),
 	}
 	if traceOutput {
 		vm.TraceLogf = t.Logf
@@ -421,7 +421,7 @@ func TestAsyncAdapterWithAbortHandler(t *testing.T) {
 	vm := &VirtualMachine{
 		Program: prog,
 		Handler: aa,
-		Vars:    make(MapVariableStorage),
+		Vars:    NewMapVariableStorage(),
 	}
 	if traceOutput {
 		vm.TraceLogf = t.Logf
