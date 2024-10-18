@@ -20,7 +20,7 @@ import (
 	"strconv"
 	"strings"
 
-	yarnpb "github.com/DrJosh9000/yarn/bytecode"
+	yarnpb "drjosh.dev/yarn/bytecode"
 )
 
 // FormatInstruction prints an instruction in a format convenient for

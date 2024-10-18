@@ -1,4 +1,4 @@
-module github.com/DrJosh9000/yarn
+module drjosh.dev/yarn
 
 go 1.21
 
