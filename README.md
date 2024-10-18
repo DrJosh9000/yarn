@@ -3,8 +3,8 @@
 A Go implementation of parts of Yarn Spinner 2.3.
 
 [![Build status](https://badge.buildkite.com/7b6f023cc8b2590b05d84ce6c15805381fd3888bc554344937.svg)](https://buildkite.com/drjosh9000/yarn)
-[![Go Reference](https://pkg.go.dev/badge/github.com/DrJosh9000/yarn.svg)](https://pkg.go.dev/github.com/DrJosh9000/yarn)
-[![Go Report Card](https://goreportcard.com/badge/github.com/DrJosh9000/yarn)](https://goreportcard.com/report/github.com/DrJosh9000/yarn)
+[![Go Reference](https://pkg.go.dev/badge/drjosh.dev/yarn.svg)](https://pkg.go.dev/drjosh.dev/yarn)
+[![Go Report Card](https://goreportcard.com/badge/drjosh.dev/yarn)](https://goreportcard.com/report/drjosh.dev/yarn)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/DrJosh9000/yarn/blob/main/LICENSE)
 
 The yarn package is a Go implementation of the
@@ -86,7 +86,7 @@ commands to the handler.
    ```go
    package main
 
-   import "github.com/DrJosh9000/yarn"
+   import "drjosh.dev/yarn"
 
    func main() {
        // Load the files (error handling omitted for brevity):

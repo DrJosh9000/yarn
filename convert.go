@@ -19,7 +19,7 @@ import (
 	"math"
 	"strconv"
 
-	yarnpb "github.com/DrJosh9000/yarn/bytecode"
+	yarnpb "drjosh.dev/yarn/bytecode"
 )
 
 // ConvertToBool attempts conversion of the standard Yarn Spinner VM types
