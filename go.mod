@@ -6,7 +6,7 @@ require (
 	github.com/alecthomas/participle/v2 v2.1.4
 	github.com/razor-1/localizer-cldr v0.2.0
 	golang.org/x/text v0.29.0
-	google.golang.org/protobuf v1.36.9
+	google.golang.org/protobuf v1.36.10
 )
 
 require github.com/google/go-cmp v0.7.0
