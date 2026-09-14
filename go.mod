@@ -1,11 +1,11 @@
 module drjosh.dev/yarn
 
-go 1.25.0
+go 1.26.0
 
 require (
 	github.com/alecthomas/participle/v2 v2.1.4
 	github.com/razor-1/localizer-cldr v0.2.0
-	golang.org/x/text v0.41.0
+	golang.org/x/text v0.42.0
 	google.golang.org/protobuf v1.36.12
 )
 
